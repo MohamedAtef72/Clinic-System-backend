@@ -1,0 +1,52 @@
+## Visual Studio
+.vscode/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Build results
+bin/
+obj/
+out/
+[Bb]uild/
+[Ll]og/
+
+## Rider
+.idea/
+*.sln.iml
+
+## .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+*.dbmdl
+*.log
+*.tlog
+
+## EF Migrations (if generated separately)
+Migrations/
+
+## Publish
+wwwroot/
+publish/
+*.Publish.xml
+
+## Secrets
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+
+## Others
+*.ncrunch*
+*.localhistory*
+*.resharper*
+*.DS_Store
+Thumbs.db
+*.vspscc
+*.vssscc
+
+# npm (if you're using frontend inside the solution)
+node_modules/
+dist/
