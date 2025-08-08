@@ -5,14 +5,12 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Clinic_System.Domain.Common;
 
 namespace Clinic_System.Domain.Models
 {
-    public class Receptionist : PersonInfo
+    public class Receptionist
     {
-        [Key]
-        public string Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
         public short ShiftStart { get; set; }

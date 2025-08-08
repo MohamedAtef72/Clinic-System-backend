@@ -12,7 +12,7 @@ namespace Clinic_System.Domain.Models
         public int Id { get; set; }
 
         [ForeignKey(nameof(Doctor))]
-        public string DoctorId { get; set; }
+        public Guid DoctorId { get; set; }
         public Doctor Doctor { get; set; }
 
         public DateTime StartTime { get; set; }
