@@ -19,7 +19,7 @@ namespace Clinic_System.Domain.Models
 
         [Required]
         [ForeignKey(nameof(Patient))]
-        public string PatientId { get; set; }
+        public Guid PatientId { get; set; }
 
         [Required]
         public DateTime Date { get; set; }
