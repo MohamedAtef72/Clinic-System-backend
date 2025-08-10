@@ -51,5 +51,4 @@ Thumbs.db
 node_modules/
 dist/
 
-Clinic-System.API/appsettings.json
-Clinic-System.API/appsettings.Development.json
+.env
