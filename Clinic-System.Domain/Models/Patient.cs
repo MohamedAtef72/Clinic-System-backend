@@ -5,20 +5,17 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Clinic_System.Domain.Common;
 
 namespace Clinic_System.Domain.Models
 {
-    public class Patient : PersonInfo
+    public class Patient
     {
-        [Key]
-        public string Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
         [ForeignKey(nameof(User))]
         public string UserId { get; set; }
 
-        [Required]
         public string BloodType { get; set; }
 
         [Required]

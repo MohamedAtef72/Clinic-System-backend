@@ -19,6 +19,7 @@ namespace Clinic_System.Infrastructure.Data
         public DbSet<Visit> Visits { get; set; }
         public DbSet<Speciality> Specialities { get; set; }
         public DbSet<DoctorAvailability> DoctorAvailabilities { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
