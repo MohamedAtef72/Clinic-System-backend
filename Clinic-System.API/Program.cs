@@ -5,11 +5,14 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
+using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using DotNetEnv;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +92,12 @@ builder.Services.AddTransient<IMailingServices, MailingService>();
 // Admin Setting
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
+
+// env 
+Env.Load();
+
+builder.Configuration
+    .AddEnvironmentVariables();
 
 
 var app = builder.Build();
