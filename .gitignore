@@ -36,6 +36,7 @@ publish/
 ## Secrets
 appsettings.Development.json
 appsettings.Local.json
+appsettings.json
 secrets.json
 
 ## Others
@@ -50,3 +51,5 @@ Thumbs.db
 # npm (if you're using frontend inside the solution)
 node_modules/
 dist/
+
+
