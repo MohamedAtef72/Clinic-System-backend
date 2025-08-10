@@ -36,7 +36,6 @@ publish/
 ## Secrets
 appsettings.Development.json
 appsettings.Local.json
-appsettings.json
 secrets.json
 
 ## Others
@@ -52,4 +51,5 @@ Thumbs.db
 node_modules/
 dist/
 
-
+Clinic-System.API/appsettings.json
+Clinic-System.API/appsettings.Development.json
