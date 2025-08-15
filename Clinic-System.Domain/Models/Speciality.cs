@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace Clinic_System.Domain.Models
@@ -14,7 +15,7 @@ namespace Clinic_System.Domain.Models
 
         [Required]
         public string Name { get; set; }
-
-        public ICollection<Doctor> Doctors { get; set; }
+        [JsonIgnore]
+        public ICollection<Doctor>? Doctors { get; set; }
     }
 }
