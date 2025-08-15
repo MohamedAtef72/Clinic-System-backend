@@ -37,10 +37,13 @@ builder.Services.AddScoped<DoctorRepository>();
 builder.Services.AddScoped<PatientRepository>();
 builder.Services.AddScoped<ReceptionistRepository>();
 builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<SpecialityRepository>();
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
+builder.Services.AddScoped<ISpecialityService, SpecialityService>();
+
 
 
 // JWT Authentication

@@ -102,7 +102,7 @@ namespace Clinic_System.API.Controllers
         }
 
 
-        [HttpPost("UpdateProfile")]
+        [HttpPut("UpdateProfile")]
         public async Task<IActionResult> UpdateProfile([FromForm] UserEditProfile userEdit)
         {
             var userId = _userRepo.GetUserIdFromJwtClaims();
@@ -157,7 +157,7 @@ namespace Clinic_System.API.Controllers
             return Ok(new { message = "Profile updated successfully" });
         }
 
-        [HttpDelete("DeleteProfile")]
+        [HttpDelete("DeleteProfile/{id}")]
         [Authorize(Roles = Role.Admin)]
         public async Task<IActionResult> DeleteProfile(string id)
         {
