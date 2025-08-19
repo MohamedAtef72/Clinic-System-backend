@@ -8,7 +8,13 @@ namespace Clinic_System.Application.DTO
 {
     public class DoctorInfo : UserInfo
     {
-        public int SpecialityId { get; set; }
+        // From Users Table
         public string UserId { get; set; }
+        public int SpecialityId { get; set; }
+
+        public string SpecialityName { get; set; }
+        public List<DoctorAvailabilityDTO> Availabilities { get; set; }
+        = new List<DoctorAvailabilityDTO>();
+
     }
 }
