@@ -17,7 +17,7 @@ namespace Clinic_System.API.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly DoctorRepository doctorRepository;
+        private readonly IDoctorService _doctorService;
         private readonly PatientRepository patientRepository;
         private readonly ReceptionistRepository receptionistRepository;
         private readonly IRegisterService _registerService;
@@ -29,7 +29,6 @@ namespace Clinic_System.API.Controllers
 
 
         public AuthController(
-            DoctorRepository doctorRepository,
             PatientRepository patientRepository,
             ReceptionistRepository receptionistRepository,
             IRegisterService registerService,
@@ -38,9 +37,9 @@ namespace Clinic_System.API.Controllers
             IAuthService authService,
             ILogger<AuthController> logger,
             IMailingServices mailingServices
-            )
+,
+            IDoctorService doctorService)
         {
-            this.doctorRepository = doctorRepository;
             this.patientRepository = patientRepository;
             this.receptionistRepository = receptionistRepository;
             _registerService = registerService;
@@ -49,6 +48,7 @@ namespace Clinic_System.API.Controllers
             _authService = authService;
             _logger = logger;
             _mailingServices = mailingServices;
+            _doctorService = doctorService;
         }
 
         [HttpPost("DoctorRegister")]
@@ -70,7 +70,7 @@ namespace Clinic_System.API.Controllers
                 SpecialityId = doctorRegister.SpecialityId
             };
 
-            await doctorRepository.AddDoctor(doctor);
+            await _doctorService.AddDoctor(doctor);
 
             return Ok("Doctor Registered Successfully");
         }

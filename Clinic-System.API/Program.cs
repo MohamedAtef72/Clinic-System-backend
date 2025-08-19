@@ -43,6 +43,7 @@ builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
 builder.Services.AddScoped<ISpecialityService, SpecialityService>();
+builder.Services.AddScoped<IDoctorService,DoctorService>();
 
 
 

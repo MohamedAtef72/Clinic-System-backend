@@ -3,11 +3,6 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
@@ -21,7 +16,7 @@ namespace Clinic_System.Infrastructure.Repositories
         }
 
         // Add Doctor
-        public async Task AddDoctor(Doctor newDoctor)
+        public async Task AddDoctorAsync(Doctor newDoctor)
         {
             if (newDoctor != null)
             {
@@ -30,16 +25,84 @@ namespace Clinic_System.Infrastructure.Repositories
             }
         }
 
-        // Get Doctor From DB
-        public async Task<Doctor> GetDoctorByIdAsync(string userId)
+        // Get All Doctors
+        public async Task<(List<DoctorInfo> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
         {
-            return await _db.Doctors.FirstOrDefaultAsync(e => e.UserId == userId);
+            var query = _db.Doctors
+                .Include(d => d.User)
+                .Include(d => d.Speciality)
+                .Include(d => d.Availabilities);
+
+            var totalCount = await query.CountAsync();
+
+            var doctors = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(doctor => new DoctorInfo
+                {
+                    Id = doctor.Id.ToString(),
+                    UserId = doctor.User.Id,
+                    UserName = doctor.User.UserName,
+                    Email = doctor.User.Email,
+                    Country = doctor.User.Country,
+                    Gender = doctor.User.Gender,
+                    ImagePath = doctor.User.ImagePath,
+                    DateOfBirth = doctor.User.DateOfBirth,
+                    RegisterDate = doctor.User.RegisterDate,
+                    SpecialityId = doctor.SpecialityId,
+                    SpecialityName = doctor.Speciality.Name,
+                    Availabilities = doctor.Availabilities
+                        .Select(a => new DoctorAvailabilityDTO
+                        {
+                            Id = a.Id,
+                            StartTime = a.StartTime,
+                            EndTime = a.EndTime,
+                            IsBooked = a.IsBooked
+                        }).ToList()
+                }).ToListAsync();
+
+            return (doctors, totalCount);
         }
 
-        // Update Doctor Async
+        // Get Doctor by UserId
+        public async Task<DoctorInfo?> GetDoctorByIdAsync(string userId)
+        {
+            var doctor = await _db.Doctors
+                .Include(d => d.User)
+                .Include(d => d.Speciality)
+                .Include(d => d.Availabilities)
+                .FirstOrDefaultAsync(e => e.UserId == userId);
+
+            if (doctor == null) return null;
+
+            return new DoctorInfo
+            {
+                Id = doctor.Id.ToString(),
+                UserId = doctor.User.Id,
+                UserName = doctor.User.UserName,
+                Email = doctor.User.Email,
+                Country = doctor.User.Country,
+                Gender = doctor.User.Gender,
+                ImagePath = doctor.User.ImagePath,
+                DateOfBirth = doctor.User.DateOfBirth,
+                RegisterDate = doctor.User.RegisterDate,
+                SpecialityId = doctor.SpecialityId,
+                SpecialityName = doctor.Speciality?.Name,
+                Availabilities = doctor.Availabilities
+                    .Select(a => new DoctorAvailabilityDTO
+                    {
+                        Id = a.Id,
+                        StartTime = a.StartTime,
+                        EndTime = a.EndTime,
+                        IsBooked = a.IsBooked
+                    }).ToList()
+            };
+        }
+
+        // Update Doctor
         public async Task<IdentityResult> UpdateDoctorAsync(string userId, UserEditProfile doctorEdit)
         {
-            var doctorFromDB = await GetDoctorByIdAsync(userId);
+            var doctorFromDB = await _db.Doctors.FirstOrDefaultAsync(e => e.UserId == userId);
             if (doctorFromDB == null)
             {
                 return IdentityResult.Failed(new IdentityError { Description = "Doctor not found." });
@@ -50,10 +113,9 @@ namespace Clinic_System.Infrastructure.Repositories
             _db.Doctors.Update(doctorFromDB);
             var changes = await _db.SaveChangesAsync();
 
-            if (changes > 0)
-                return IdentityResult.Success;
-
-            return IdentityResult.Failed(new IdentityError { Description = "No changes were made." });
+            return changes > 0
+                ? IdentityResult.Success
+                : IdentityResult.Failed(new IdentityError { Description = "No changes were made." });
         }
     }
 }
