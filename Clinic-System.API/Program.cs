@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DotNetEnv;
+using Clinic_System.Application.Services;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -38,12 +39,14 @@ builder.Services.AddScoped<PatientRepository>();
 builder.Services.AddScoped<ReceptionistRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<SpecialityRepository>();
+builder.Services.AddScoped<DoctorAvailabilityRepository>();
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
 builder.Services.AddScoped<ISpecialityService, SpecialityService>();
 builder.Services.AddScoped<IDoctorService,DoctorService>();
+builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
 
 
 
