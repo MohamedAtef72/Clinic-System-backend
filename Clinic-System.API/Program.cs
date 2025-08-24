@@ -47,8 +47,7 @@ builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
 builder.Services.AddScoped<ISpecialityService, SpecialityService>();
 builder.Services.AddScoped<IDoctorService,DoctorService>();
 builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
-
-
+builder.Services.AddScoped<IPatientService, PatientService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>

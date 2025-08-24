@@ -14,8 +14,42 @@ namespace Clinic_System.Infrastructure.Repositories
         {
             _db = db;
         }
+        public async Task<(List<PatientSummaryDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
+        {
+            var query = _db.Patients
+                .Include(p => p.User)
+                .Include(p => p.Appointments);
 
-        public async Task AddPatient(Patient newPatient)
+            var totalCount = await query.CountAsync();
+
+            var patients = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(patient => new PatientSummaryDTO
+                {
+                    Id = patient.Id,
+                    UserId = patient.User.Id,
+                    BloodType = patient.BloodType,
+                    MedicalHistory = patient.MedicalHistory,
+                }).ToListAsync();
+
+            return (patients, totalCount);
+        }
+
+        public async Task<IEnumerable<Patient>> GetAllPatientsAsync()
+        {
+            return await _db.Patients
+                .Include(p => p.User)
+                .Include(p => p.Appointments)
+                .ToListAsync();
+        }
+        // Get Patient From DB
+        public async Task<Patient> GetPatientByIdAsync(string userId)
+        {
+            return await _db.Patients.FirstOrDefaultAsync(e => e.UserId == userId);
+        }
+
+        public async Task AddPatientAsync(Patient newPatient)
         {
             if (newPatient != null)
             {
@@ -23,11 +57,14 @@ namespace Clinic_System.Infrastructure.Repositories
                 await _db.SaveChangesAsync();
             }
         }
-
-        // Get Patient From DB
-        public async Task<Patient> GetPatientByIdAsync(string userId)
+        // Add Patient Async
+        public async Task AddPatient(Patient newPatient)
         {
-            return await _db.Patients.FirstOrDefaultAsync(e => e.UserId == userId);
+            if (newPatient != null)
+            {
+                await _db.Patients.AddAsync(newPatient);
+                await _db.SaveChangesAsync();
+            }
         }
 
         // Update Patient Async
