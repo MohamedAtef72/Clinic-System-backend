@@ -42,6 +42,8 @@ builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<SpecialityRepository>();
 builder.Services.AddScoped<DoctorAvailabilityRepository>();
 builder.Services.AddScoped<AppointmentRepository>();
+builder.Services.AddScoped<VisitRepository>();
+
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -51,6 +53,8 @@ builder.Services.AddScoped<IDoctorService,DoctorService>();
 builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<IVisitService, VisitService>();
+
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>

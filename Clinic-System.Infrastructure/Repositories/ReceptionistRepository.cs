@@ -3,11 +3,6 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
@@ -35,7 +30,7 @@ namespace Clinic_System.Infrastructure.Repositories
             return await _db.Receptionists.FirstOrDefaultAsync(e => e.UserId == userId);
         }
 
-        // Update Doctor Async
+        // Update Receptionist Async
         public async Task<IdentityResult> UpdateReceptionistAsync(string userId, UserEditProfile receptionEdit)
         {
             var receptionistFromDB = await GetReceptionistByIdAsync(userId);

@@ -10,6 +10,10 @@ namespace Clinic_System.Infrastructure.Services
         {
             CreateMap<Appointment, AppointmentDTO>();
             CreateMap<AppointmentDTO, Appointment>();
+            CreateMap<Visit, VisitReadDTO>();
+            CreateMap<VisitCreateDTO, Visit>();
+            CreateMap<VisitReadDTO, Visit>();
+
         }
     }
 
