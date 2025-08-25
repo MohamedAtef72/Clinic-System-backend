@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DotNetEnv;
 using Clinic_System.Application.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,6 +41,7 @@ builder.Services.AddScoped<ReceptionistRepository>();
 builder.Services.AddScoped<UserRepository>();
 builder.Services.AddScoped<SpecialityRepository>();
 builder.Services.AddScoped<DoctorAvailabilityRepository>();
+builder.Services.AddScoped<AppointmentRepository>();
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -48,6 +50,7 @@ builder.Services.AddScoped<ISpecialityService, SpecialityService>();
 builder.Services.AddScoped<IDoctorService,DoctorService>();
 builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -72,6 +75,13 @@ builder.Services.AddAuthentication(options =>
 // Add Cloudinary Services
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 builder.Services.AddScoped<IPhotoService, PhotoService>();
+
+// Auto Mapper Services
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.AddProfile<MappingProfile>();
+});
+
 
 // Rate Limiting
 builder.Services.AddMemoryCache();
