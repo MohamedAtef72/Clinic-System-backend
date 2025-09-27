@@ -6,10 +6,9 @@ namespace Clinic_System.Application.DTO
     {
         public string UserName { get; set; }
         public string Country { get; set; }
-        public IFormFile Image { get; set; }
-        public int? SpecialityId { get; set; }
+        public IFormFile? Image { get; set; }
         public string? MedicalHistory { get; set; }
-        public short? ShiftStart { get; set; }
-        public short? ShiftEnd { get; set; }
+        public TimeSpan? ShiftStart { get; set; }
+        public TimeSpan? ShiftEnd { get; set; }
     }
 }

@@ -14,22 +14,29 @@ namespace Clinic_System.Application.Services
             _patientRepository = patientRepository;
         }
 
-        public async Task<(List<PatientSummaryDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
         {
             return await _patientRepository.GetAllPatientsAsync(pageNumber, pageSize);
         }
 
-        public async Task<PatientSummaryDTO> GetPatientByIdAsync(string id)
+        public async Task<PatientInfoDTO> GetPatientByIdAsync(string userId)
         {
-            var patient = await _patientRepository.GetPatientByIdAsync(id);
+            var patient = await _patientRepository.GetPatientByIdAsync(userId);
             if (patient == null) return null;
 
-            return new PatientSummaryDTO
+            return new PatientInfoDTO
             {
-                Id = patient.Id,
-                UserId = patient.UserId,
+                Id = patient.Id.ToString(),
+                UserName = patient.User.UserName,
+                Email = patient.User.Email,
+                Country = patient.User.Country,
+                Gender = patient.User.Gender,
+                ImagePath = patient.User.ImagePath,
+                DateOfBirth = patient.User.DateOfBirth,
+                RegisterDate = patient.User.RegisterDate,
+                UserId = patient.User.Id,
                 BloodType = patient.BloodType,
-                MedicalHistory = patient.MedicalHistory
+                MedicalHistory = patient.MedicalHistory,
             };
         }
     }

@@ -56,9 +56,10 @@ namespace Clinic_System.API.Controllers
                 if (doctor == null)
                     return NotFound(new { message = "Doctor details not found" });
 
-                var dto = _userRepo.MapBaseUser<DoctorInfo>(userFromDB);
+                var dto = _userRepo.MapBaseUser<DoctorInfoDTO>(userFromDB);
                 dto.SpecialityId = doctor.SpecialityId;
                 dto.UserId = doctor.UserId;
+                dto.SpecialityName = doctor.SpecialityName;
                 user = dto;
                 message = "Doctor Retrieved Successfully";
             }
@@ -68,7 +69,7 @@ namespace Clinic_System.API.Controllers
                 if (patient == null)
                     return NotFound(new { message = "Patient details not found" });
 
-                var dto = _userRepo.MapBaseUser<PatientInfo>(userFromDB);
+                var dto = _userRepo.MapBaseUser<PatientInfoDTO>(userFromDB);
                 dto.BloodType = patient.BloodType;
                 dto.MedicalHistory = patient.MedicalHistory;
                 dto.UserId = patient.UserId;
@@ -81,7 +82,7 @@ namespace Clinic_System.API.Controllers
                 if (receptionist == null)
                     return NotFound(new { message = "Receptionist details not found" });
 
-                var dto = _userRepo.MapBaseUser<ReceptionistInfo>(userFromDB);
+                var dto = _userRepo.MapBaseUser<ReceptionistInfoDTO>(userFromDB);
                 dto.ShiftStart = receptionist.ShiftStart;
                 dto.ShiftEnd = receptionist.ShiftEnd;
                 dto.UserId = receptionist.UserId;
@@ -98,7 +99,7 @@ namespace Clinic_System.API.Controllers
                 return Forbid("User role not authorized");
             }
 
-            return Ok(new { message, user });
+            return Ok(new { message, user , role = userRole });
         }
 
 

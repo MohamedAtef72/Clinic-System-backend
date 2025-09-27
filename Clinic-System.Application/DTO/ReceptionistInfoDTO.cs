@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace Clinic_System.Application.DTO
 {
-    public class ReceptionistInfo : UserInfo
+    public class ReceptionistInfoDTO : UserInfo
     {
         public string UserId { get; set; }
-        public short ShiftStart { get; set; }
-        public short ShiftEnd { get; set; }
+        public TimeSpan ShiftStart { get; set; }
+        public TimeSpan ShiftEnd { get; set; }
     }
 }

@@ -11,12 +11,18 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using DotNetEnv;
 using Clinic_System.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// env
+Env.Load();
+builder.Configuration.AddEnvironmentVariables();
+
+// jwtSetttings from appsettings.json
+var jwtSettings = builder.Configuration.GetSection("JWT");
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -26,7 +32,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add Identity with Roles
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => { })
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
+    // --- Password settings ---
+    options.Password.RequireDigit = true;           // Requires at least one number (0-9)
+    options.Password.RequiredLength = 8;            // Minimum password length
+    options.Password.RequireNonAlphanumeric = true; // Requires at least one special character (e.g., !, @, #)
+    options.Password.RequireUppercase = true;       // Requires at least one uppercase letter (A-Z)
+    options.Password.RequireLowercase = true;       // Requires at least one lowercase letter (a-z)
+})
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
@@ -64,17 +77,45 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    var key = Encoding.ASCII.GetBytes(builder.Configuration["JWT:SecretKey"]!);
-
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ClockSkew = TimeSpan.Zero
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings["Issuer"],
+
+        ValidateAudience = true,
+        ValidAudience = jwtSettings["Audience"],
+
+        ValidateLifetime = true,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtSettings["SecretKey"])),
+        ClockSkew = TimeSpan.Zero // remove default 5 min tolerance
+    };
+
+    // Read JWT from HttpOnly cookie
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            // Check if JWT is in cookie
+            if (context.Request.Cookies.ContainsKey("t"))
+            {
+                context.Token = context.Request.Cookies["t"];
+            }
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("JWT Token validated successfully");
+            return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"JWT Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        }
     };
 });
+
 
 // Add Cloudinary Services
 builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
@@ -115,11 +156,20 @@ builder.Services.AddTransient<IMailingServices, MailingService>();
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
-// env 
-Env.Load();
 
-builder.Configuration
-    .AddEnvironmentVariables();
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        policy =>
+        {
+            policy.WithOrigins("https://localhost:3000") // React app URL
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); 
+        });
+});
+
 
 
 var app = builder.Build();
@@ -147,7 +197,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseIpRateLimiting();
-//app.UseCors("AllowReactApp");
+app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

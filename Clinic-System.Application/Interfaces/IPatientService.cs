@@ -9,7 +9,7 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface IPatientService
     {
-        Task<(List<PatientSummaryDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize);
-        Task<PatientSummaryDTO> GetPatientByIdAsync(string id);
+        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize);
+        Task<PatientInfoDTO> GetPatientByIdAsync(string id);
     }
 }

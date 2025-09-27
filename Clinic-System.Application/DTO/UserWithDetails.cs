@@ -21,7 +21,7 @@ namespace Clinic_System.Application.DTO
         public string MedicalHistory { get; set; }
 
         // Extra info for Receptionist
-        public short? ShiftStart { get; set; }
-        public short? ShiftEnd { get; set; }
+        public TimeSpan? ShiftStart { get; set; }
+        public TimeSpan? ShiftEnd { get; set; }
     }
 }

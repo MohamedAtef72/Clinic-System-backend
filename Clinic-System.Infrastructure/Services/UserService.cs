@@ -59,7 +59,7 @@ namespace Clinic_System.Infrastructure.Services
             }
         }
 
-        // Get All Users With Details From Each Table With Pagination 
+        //// Get All Users With Details From Each Table With Pagination 
         public async Task<(List<UserWithDetails> Users, int TotalCount)> GetAllUsersWithDetailsAsync(int pageNumber, int pageSize)
         {
             var query = from user in _db.Users

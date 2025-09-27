@@ -23,6 +23,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("AllSpecialities")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var specialities = await _service.GetAllAsync();
