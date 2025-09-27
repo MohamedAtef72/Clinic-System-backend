@@ -39,8 +39,8 @@ namespace Clinic_System.Infrastructure.Repositories
                 return IdentityResult.Failed(new IdentityError { Description = "Receptionist not found." });
             }
 
-            receptionistFromDB.ShiftStart = receptionEdit.ShiftStart.Value;
-            receptionistFromDB.ShiftEnd = receptionEdit.ShiftEnd.Value ;
+            receptionistFromDB.ShiftStart = (TimeSpan)receptionEdit.ShiftStart;
+            receptionistFromDB.ShiftEnd = (TimeSpan)receptionEdit.ShiftEnd;
 
             _db.Receptionists.Update(receptionistFromDB);
             var changes = await _db.SaveChangesAsync();

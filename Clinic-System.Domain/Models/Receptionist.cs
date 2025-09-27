@@ -13,10 +13,14 @@ namespace Clinic_System.Domain.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
-        public short ShiftStart { get; set; }
+        [Column(TypeName = "time")]
+
+        public TimeSpan ShiftStart { get; set; }
 
         [Required]
-        public short ShiftEnd { get; set; }
+        [Column(TypeName = "time")]
+
+        public TimeSpan ShiftEnd { get; set; }
 
         [Required]
         [ForeignKey(nameof(User))]

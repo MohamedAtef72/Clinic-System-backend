@@ -18,7 +18,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("AllDoctors")]
-        public async Task<IActionResult> GetAll([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetAll([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 6)
         {
             var (doctors, totalCount) = await _doctorService.GetAllDoctorsAsync(pageNumber, pageSize);
             return Ok(new

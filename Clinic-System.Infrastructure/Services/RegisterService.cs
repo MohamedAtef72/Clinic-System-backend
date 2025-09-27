@@ -26,8 +26,8 @@ namespace Clinic_System.Infrastructure.Services
                 return ("Passwords do not match", null);
 
             var url = await _photoService.UploadImageAsync(image);
-            if (url == null)
-                return ("Image upload failed", null);
+            //if (url == null)
+            //    return ("Image upload failed", null);
 
             var user = new ApplicationUser
             {

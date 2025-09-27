@@ -8,10 +8,12 @@ using System.Threading.Tasks;
 
 namespace Clinic_System.Application.DTO
 {
-    public class PatientRegister : UserRegisterBase
+    public class ReceptionistRegisterDTO : UserRegisterBase
     {
-        public string BloodType { get; set; }
         [Required]
-        public string MedicalHistory { get; set; }
+        public TimeSpan ShiftStart { get; set; }
+
+        [Required]
+        public TimeSpan ShiftEnd { get; set; }
     }
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Clinic_System.Application.DTO
 {
-    public class DoctorInfo : UserInfo
+    public class DoctorInfoDTO : UserInfo
     {
         // From Users Table
         public string UserId { get; set; }
@@ -15,6 +15,5 @@ namespace Clinic_System.Application.DTO
         public string SpecialityName { get; set; }
         public List<DoctorAvailabilityDTO> Availabilities { get; set; }
         = new List<DoctorAvailabilityDTO>();
-
     }
 }

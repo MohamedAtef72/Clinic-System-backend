@@ -3,6 +3,7 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Numerics;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
@@ -14,7 +15,7 @@ namespace Clinic_System.Infrastructure.Repositories
         {
             _db = db;
         }
-        public async Task<(List<PatientSummaryDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
         {
             var query = _db.Patients
                 .Include(p => p.User)
@@ -25,9 +26,16 @@ namespace Clinic_System.Infrastructure.Repositories
             var patients = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(patient => new PatientSummaryDTO
+                .Select(patient => new PatientInfoDTO
                 {
-                    Id = patient.Id,
+                    Id = patient.Id.ToString(),
+                    UserName = patient.User.UserName,
+                    Email = patient.User.Email,
+                    Country = patient.User.Country,
+                    Gender = patient.User.Gender,
+                    ImagePath = patient.User.ImagePath,
+                    DateOfBirth = patient.User.DateOfBirth,
+                    RegisterDate = patient.User.RegisterDate,
                     UserId = patient.User.Id,
                     BloodType = patient.BloodType,
                     MedicalHistory = patient.MedicalHistory,

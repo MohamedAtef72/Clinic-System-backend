@@ -20,12 +20,12 @@ namespace Clinic_System.Infrastructure.Services
             await _doctorRepo.AddDoctorAsync(newDoctor);
         }
 
-        public async Task<(List<DoctorInfo> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
         {
             return await _doctorRepo.GetAllDoctorsAsync(pageNumber, pageSize);
         }
 
-        public async Task<DoctorInfo> GetDoctorByIdAsync(string userId)
+        public async Task<DoctorInfoDTO> GetDoctorByIdAsync(string userId)
         {
             return await _doctorRepo.GetDoctorByIdAsync(userId);
         }

@@ -11,6 +11,11 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.ComponentModel.DataAnnotations;
+using Clinic_System.Infrastructure.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity.Data;
+using Newtonsoft.Json.Linq;
+using Sprache;
 
 namespace Clinic_System.API.Controllers
 {
@@ -27,6 +32,7 @@ namespace Clinic_System.API.Controllers
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
         private readonly IMailingServices _mailingServices;
+        private readonly AppDbContext _context;
 
         public AuthController(
             PatientRepository patientRepository,
@@ -37,7 +43,8 @@ namespace Clinic_System.API.Controllers
             IAuthService authService,
             ILogger<AuthController> logger,
             IMailingServices mailingServices,
-            IDoctorService doctorService)
+            IDoctorService doctorService,
+            AppDbContext context)
         {
             _patientRepository = patientRepository ?? throw new ArgumentNullException(nameof(patientRepository));
             _receptionistRepository = receptionistRepository ?? throw new ArgumentNullException(nameof(receptionistRepository));
@@ -48,10 +55,11 @@ namespace Clinic_System.API.Controllers
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mailingServices = mailingServices ?? throw new ArgumentNullException(nameof(mailingServices));
             _doctorService = doctorService ?? throw new ArgumentNullException(nameof(doctorService));
+            _context = context;
         }
 
         [HttpPost("DoctorRegister")]
-        public async Task<IActionResult> DoctorRegister([FromForm][Required] DoctorRegister doctorRegister)
+        public async Task<IActionResult> DoctorRegister([FromForm][Required] DoctorRegisterDTO doctorRegister)
         {
             try
             {
@@ -81,6 +89,35 @@ namespace Clinic_System.API.Controllers
 
                 await _doctorService.AddDoctor(doctor);
 
+                var body = $@"
+                        <!DOCTYPE html>
+                        <html>
+                          <body>
+                            <h2>Welcome to Clinic-System 👩‍⚕️</h2>
+                            <p>Dear Doctor,</p>
+                            <p>Your account has been successfully created.</p>
+                            <p><b>Email:</b> {doctorRegister.Email}</p>
+                            <p><b>Password:</b> {doctorRegister.Password}</p>
+                            <p>Please change your password after first login.</p>
+                          </body>
+                        </html>";
+
+                var mailRequest = new MailRequestDTO
+                {
+                    ToEmail = doctorRegister.Email,
+                    Subject = "Clinic-System | Your Account Credentials",
+                    Body = body,
+                    Attachments = null
+                };
+
+                await _mailingServices.SendEmailAsync(
+                    mailRequest.ToEmail,
+                    mailRequest.Subject,
+                    mailRequest.Body,
+                    mailRequest.Attachments
+                );
+
+
                 _logger.LogInformation("Doctor registered successfully with ID: {UserId}", user.Id);
                 return CreatedAtAction(nameof(DoctorRegister), new { Message = "Doctor registered successfully", UserId = user.Id });
             }
@@ -102,7 +139,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("PatientRegister")]
-        public async Task<IActionResult> PatientRegister([FromForm][Required] PatientRegister patientRegister)
+        public async Task<IActionResult> PatientRegister([FromForm][Required] PatientRegisterDTO patientRegister)
         {
             try
             {
@@ -150,7 +187,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("ReceptionRegister")]
-        public async Task<IActionResult> ReceptionistRegister([FromForm][Required] ReceptionistRegister receptionistRegister)
+        public async Task<IActionResult> ReceptionistRegister([FromForm][Required] ReceptionistRegisterDTO receptionistRegister)
         {
             try
             {
@@ -181,6 +218,34 @@ namespace Clinic_System.API.Controllers
 
                 await _receptionistRepository.AddReceptionist(receptionist);
 
+                var body = $@"
+                        <!DOCTYPE html>
+                        <html>
+                          <body>
+                            <h2>Welcome to Clinic-System 👩‍⚕️</h2>
+                            <p>Dear Receptionist,</p>
+                            <p>Your account has been successfully created.</p>
+                            <p><b>Email:</b> {receptionistRegister.Email}</p>
+                            <p><b>Password:</b> {receptionistRegister.Password}</p>
+                            <p>Please change your password after first login.</p>
+                          </body>
+                        </html>";
+
+                var mailRequest = new MailRequestDTO
+                {
+                    ToEmail = receptionistRegister.Email,
+                    Subject = "Clinic-System | Your Account Credentials",
+                    Body = body,
+                    Attachments = null
+                };
+
+                await _mailingServices.SendEmailAsync(
+                    mailRequest.ToEmail,
+                    mailRequest.Subject,
+                    mailRequest.Body,
+                    mailRequest.Attachments
+                );
+
                 _logger.LogInformation("Receptionist registered successfully with ID: {UserId}", user.Id);
                 return CreatedAtAction(nameof(ReceptionistRegister), new { Message = "Receptionist registered successfully", UserId = user.Id });
             }
@@ -202,207 +267,275 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("Login")]
-        public async Task<IActionResult> Login([FromBody][Required] UserLogin userFromRequest)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             try
             {
-                if (userFromRequest == null)
-                {
-                    return BadRequest(new { Message = "Login credentials are required" });
-                }
-
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(new { Message = "Invalid login data", Errors = ModelState });
-                }
-
-                // Additional validation
-                if (string.IsNullOrWhiteSpace(userFromRequest.Email) || string.IsNullOrWhiteSpace(userFromRequest.Password))
+                // Validate request
+                if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
                 {
                     return BadRequest(new { Message = "Email and password are required" });
                 }
 
-                var userFromDb = await _userManager.Users
-                    .Include(u => u.RefreshTokens)
-                    .FirstOrDefaultAsync(u => u.Email == userFromRequest.Email);
+                _logger.LogInformation("Login attempt for email: {Email}", request.Email);
 
-                if (userFromDb == null)
+                // Find user by email
+                var user = await _userManager.FindByEmailAsync(request.Email);
+                if (user == null)
                 {
-                    _logger.LogWarning("Login attempt with non-existent email: {Email}", userFromRequest.Email);
-                    return Unauthorized(new { Message = "Invalid credentials" });
+                    _logger.LogWarning("Login failed: User not found for email: {Email}", request.Email);
+                    return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                if (!await _userManager.CheckPasswordAsync(userFromDb, userFromRequest.Password))
+                // Check password
+                var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+                if (!passwordValid)
                 {
-                    _logger.LogWarning("Failed login attempt for user: {Email}", userFromRequest.Email);
-                    return Unauthorized(new { Message = "Invalid credentials" });
+                    _logger.LogWarning("Login failed: Invalid password for email: {Email}", request.Email);
+                    return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                // Check if email is confirmed (if email confirmation is required)
-                if (!userFromDb.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail)
+                // Generate tokens
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var result = await _authService.GenerateTokenAsync(user, clientIp);
+
+                if (result == null)
                 {
-                    return Unauthorized(new { Message = "Email not confirmed" });
+                    _logger.LogError("Failed to generate tokens for user: {Email}", request.Email);
+                    return StatusCode(500, new { Message = "Failed to generate authentication tokens" });
                 }
 
-                // Check if account is locked
-                if (await _userManager.IsLockedOutAsync(userFromDb))
+                // Parse JWT to get expiration
+                var jwtHandler = new JwtSecurityTokenHandler();
+                var jwtToken = jwtHandler.ReadJwtToken(result.AccessToken);
+
+                // Set cookies using the result object
+                Response.Cookies.Append("t", result.AccessToken, new CookieOptions
                 {
-                    _logger.LogWarning("Login attempt on locked account: {Email}", userFromRequest.Email);
-                    return Unauthorized(new { Message = "Account is locked" });
-                }
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/",
+                    Expires = jwtToken.ValidTo
+                });
 
-                var userClaims = await _userManager.GetClaimsAsync(userFromDb);
-                var authClaims = new List<Claim>
+                Response.Cookies.Append("rt", result.RefreshToken, new CookieOptions
                 {
-                    new Claim(ClaimTypes.NameIdentifier, userFromDb.Id),
-                    new Claim(ClaimTypes.Name, userFromDb.UserName ?? string.Empty),
-                    new Claim(ClaimTypes.Email, userFromDb.Email ?? string.Empty),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
-                };
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/",
+                    Expires = DateTime.UtcNow.AddDays(7)
+                });
 
-                authClaims.AddRange(userClaims);
+                // Add CORS headers
+                Response.Headers.Add("Access-Control-Allow-Credentials", "true");
 
-                var roles = await _userManager.GetRolesAsync(userFromDb);
-                authClaims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
-                var jwtSettings = _config.GetSection("JWT");
-                var secretKey = jwtSettings["SecretKey"];
-
-                if (string.IsNullOrEmpty(secretKey))
-                {
-                    _logger.LogError("JWT SecretKey not configured");
-                    return StatusCode(500, new { Message = "Server configuration error" });
-                }
-
-                var signInKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-                var credentials = new SigningCredentials(signInKey, SecurityAlgorithms.HmacSha256);
-
-                var accessTokenExpiration = DateTime.UtcNow.AddMinutes(30);
-                var jwtToken = new JwtSecurityToken(
-                    audience: jwtSettings["AudienceIP"],
-                    issuer: jwtSettings["IssuerIP"],
-                    claims: authClaims,
-                    expires: accessTokenExpiration,
-                    signingCredentials: credentials
-                );
-
-                var accessToken = new JwtSecurityTokenHandler().WriteToken(jwtToken);
-
-                // Clean up old refresh tokens
-                var expiredTokens = userFromDb.RefreshTokens?.Where(rt => rt.ExpiryDate < DateTime.UtcNow).ToList();
-                if (expiredTokens?.Any() == true)
-                {
-                    foreach (var token in expiredTokens)
-                    {
-                        userFromDb.RefreshTokens.Remove(token);
-                    }
-                }
-
-                var refreshToken = new RefreshToken
-                {
-                    Token = Guid.NewGuid().ToString(),
-                    CreatedDate = DateTime.UtcNow,
-                    ExpiryDate = DateTime.UtcNow.AddDays(7),
-                    CreatedByIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    UserId = userFromDb.Id
-                };
-
-                userFromDb.RefreshTokens ??= new List<RefreshToken>();
-                userFromDb.RefreshTokens.Add(refreshToken);
-
-                await _userManager.UpdateAsync(userFromDb);
-
-                _logger.LogInformation("User logged in successfully: {Email}", userFromRequest.Email);
+                _logger.LogInformation("Login successful for user: {Email}", request.Email);
+                _logger.LogInformation("Access token expires at: {ExpiryTime}", jwtToken.ValidTo);
 
                 return Ok(new
                 {
-                    token = accessToken,
-                    expiration = accessTokenExpiration,
-                    refreshToken = refreshToken.Token,
-                    refreshTokenExpiry = refreshToken.ExpiryDate,
-                    user = new
-                    {
-                        id = userFromDb.Id,
-                        email = userFromDb.Email,
-                        userName = userFromDb.UserName,
-                        roles = roles
-                    }
+                    Message = "Login successful",
+                    ExpiresAt = jwtToken.ValidTo
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during login for user: {Email}", userFromRequest?.Email);
+                _logger.LogError(ex, "Unexpected error during login");
                 return StatusCode(500, new { Message = "An error occurred during login" });
             }
         }
 
         [HttpPost("Refresh")]
-        public async Task<IActionResult> Refresh([FromBody][Required] AuthResultDTO request)
+        public async Task<IActionResult> Refresh()
         {
             try
             {
-                if (request == null)
-                    return BadRequest(new { Message = "Token refresh data is required" });
+                _logger.LogInformation("Token refresh attempt started");
 
-                if (string.IsNullOrWhiteSpace(request.AccessToken) || string.IsNullOrWhiteSpace(request.RefreshToken))
-                    return BadRequest(new { Message = "Access token and refresh token are required" });
-
-                var principal = _authService.GetPrincipalFromExpiredToken(request.AccessToken);
-                if (principal == null)
+                // Debug: Log all cookies received
+                _logger.LogInformation($"Total cookies received: {Request.Cookies.Count}");
+                foreach (var cookie in Request.Cookies)
                 {
-                    _logger.LogWarning("Invalid access token provided for refresh");
-                    return BadRequest(new { Message = "Invalid access token" });
+                    _logger.LogInformation($"Cookie: {cookie.Key} = {cookie.Value?.Substring(0, Math.Min(20, cookie.Value.Length))}...");
                 }
 
-                var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (string.IsNullOrEmpty(userId))
-                    return BadRequest(new { Message = "Invalid token claims" });
+                // Read refresh token from cookies
+                if (!Request.Cookies.TryGetValue("rt", out var refreshToken) || string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    _logger.LogWarning("Token refresh failed: Missing refresh token cookie");
+                    return BadRequest(new { Message = "Refresh token cookie is required" });
+                }
 
-                var user = await _userManager.Users
-                    .Include(u => u.RefreshTokens)
-                    .FirstOrDefaultAsync(u => u.Id == userId);
+                // Try to get access token, but it might be expired/missing
+                Request.Cookies.TryGetValue("t", out var accessToken);
+
+                string userId = null;
+
+                // Try to extract user info from access token if available
+                if (!string.IsNullOrWhiteSpace(accessToken))
+                {
+                    try
+                    {
+                        var principal = _authService.GetPrincipalFromExpiredToken(accessToken);
+                        userId = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                        _logger.LogInformation("Extracted user ID from access token: {UserId}", userId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogInformation("Could not extract user from access token (this is normal): {Error}", ex.Message);
+                    }
+                }
+
+                // If we couldn't get userId from token, find user by refresh token
+                ApplicationUser user;
+
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    // Get user by ID from token
+                    user = await _userManager.Users
+                        .Include(u => u.RefreshTokens)
+                        .FirstOrDefaultAsync(u => u.Id == userId);
+                }
+                else
+                {
+                    // Find user by refresh token directly
+                    _logger.LogInformation("No valid access token, finding user by refresh token");
+
+                    // Find the refresh token in database first
+                    var refreshTokenEntity = await _context.RefreshTokens
+                        .Include(rt => rt.User)
+                        .ThenInclude(u => u.RefreshTokens)
+                        .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+                    if (refreshTokenEntity == null)
+                    {
+                        _logger.LogWarning("Refresh token not found in database");
+                        return Unauthorized(new { Message = "Invalid refresh token" });
+                    }
+
+                    user = refreshTokenEntity.User;
+                    userId = user.Id;
+                    _logger.LogInformation("Found user by refresh token: {UserId}", userId);
+                }
 
                 if (user == null)
                 {
-                    _logger.LogWarning("Token refresh attempted for non-existent user: {UserId}", userId);
+                    _logger.LogWarning("User not found for refresh token");
                     return Unauthorized(new { Message = "User not found" });
                 }
 
-                var storedRefreshToken = user.RefreshTokens?.FirstOrDefault(rt => rt.Token == request.RefreshToken);
+                // Validate refresh token
+                var storedRefreshToken = user.RefreshTokens?.FirstOrDefault(rt => rt.Token == refreshToken);
                 if (storedRefreshToken == null)
                 {
-                    _logger.LogWarning("Invalid refresh token used: {UserId}", userId);
+                    _logger.LogWarning("Refresh token not found in user's tokens for user: {UserId}", userId);
                     return Unauthorized(new { Message = "Invalid refresh token" });
                 }
 
                 if (storedRefreshToken.ExpiryDate < DateTime.UtcNow)
                 {
-                    _logger.LogWarning("Expired refresh token used: {UserId}", userId);
+                    _logger.LogWarning("Refresh token expired for user {UserId}. Expired at: {ExpiryDate}",
+                        userId, storedRefreshToken.ExpiryDate);
+
                     // Clean up expired token
                     user.RefreshTokens.Remove(storedRefreshToken);
                     await _userManager.UpdateAsync(user);
                     return Unauthorized(new { Message = "Refresh token expired" });
                 }
 
+                _logger.LogInformation("Refresh token validated successfully, generating new tokens");
+
+                // Generate new tokens
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
                 var result = await _authService.GenerateTokenAsync(user, clientIp);
 
-                // Remove old refresh token and save the new one
+                if (result == null)
+                {
+                    _logger.LogError("Failed to generate new tokens for user: {UserId}", userId);
+                    return StatusCode(500, new { Message = "Failed to generate new tokens" });
+                }
+
+                // Remove old refresh token from database
                 user.RefreshTokens.Remove(storedRefreshToken);
                 await _userManager.UpdateAsync(user);
 
-                _logger.LogInformation("Token refreshed successfully for user: {UserId}", userId);
-                return Ok(result);
-            }
-            catch (SecurityTokenException ex)
-            {
-                _logger.LogWarning(ex, "Security token exception during refresh");
-                return BadRequest(new { Message = "Invalid token" });
+                // Get new token expiration info
+                var jwtHandler = new JwtSecurityTokenHandler();
+                var jwtToken = jwtHandler.ReadJwtToken(result.AccessToken);
+
+                // Set new cookies
+                Response.Cookies.Append("t", result.AccessToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/",
+                    Expires = jwtToken.ValidTo,
+                });
+
+                Response.Cookies.Append("rt", result.RefreshToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/",
+                    Expires = DateTime.UtcNow.AddDays(7),
+                });
+
+                Response.Headers.Add("Access-Control-Allow-Credentials", "true");
+
+                _logger.LogInformation("Token refresh completed successfully for user: {UserId}", userId);
+                _logger.LogInformation("New access token expires at: {ExpiryTime}", jwtToken.ValidTo);
+
+                return Ok(new
+                {
+                    Message = "Token refreshed successfully",
+                    ExpiresAt = jwtToken.ValidTo
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error refreshing token");
+                _logger.LogError(ex, "Unexpected error during token refresh");
                 return StatusCode(500, new { Message = "An error occurred while refreshing the token" });
+            }
+        }
+        [HttpGet("Me")]
+        public IActionResult GetCurrentUser()
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var role = User.FindFirst(ClaimTypes.Role)?.Value;
+                var email = User.FindFirst(ClaimTypes.Email)?.Value;
+
+                Console.WriteLine($"JWT Authentication Status: {User.Identity.IsAuthenticated}");
+                Console.WriteLine($"UserId: {userId}, Role: {role}, Email: {email}");
+
+                if (User.Identity.IsAuthenticated && userId != null && role != null)
+                {
+                    return Ok(new
+                    {
+                        Message = "User Retrieved Successfully",
+                        user = new { userId, role, email },
+                        isAuthenticated = true
+                    });
+                }
+                else
+                {
+                    return Ok(new
+                    {
+                        Message = "User UN Authorized",
+                        user = new { userId, role },
+                        isAuthenticated = false
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetCurrentUser: {ex.Message}");
+                return StatusCode(500, new { Message = "Internal server error", isAuthenticated = false });
             }
         }
 
@@ -437,13 +570,33 @@ namespace Clinic_System.API.Controllers
                 var encodedEmail = Uri.EscapeDataString(email);
                 var callBackUrl = $"https://localhost:7242/ResetPassword?token={encodedToken}&email={encodedEmail}";
 
+                var body = $@"
+                            <!DOCTYPE html>
+                            <html>
+                              <body style='font-family: Arial, sans-serif; line-height:1.6; color:#333;'>
+                                <h2 style='color:#1976d2;'>Clinic-System Password Reset</h2>
+                                <p>Dear user,</p>
+                                <p>We received a request to reset your password. Please click the button below to set a new password:</p>
+                                <p>
+                                  <a href='{callBackUrl}' 
+                                     style='display:inline-block; padding:10px 20px; background:#1976d2; color:white; text-decoration:none; border-radius:5px;'>
+                                    Reset Password
+                                  </a>
+                                </p>
+                                <p>If you did not request a password reset, you can safely ignore this email.</p>
+                                <br />
+                                <p style='font-size:12px; color:#666;'>Clinic-System Team</p>
+                              </body>
+                            </html>";
+
                 var mailRequest = new MailRequestDTO
                 {
                     ToEmail = email,
                     Subject = "Clinic-System | Password Reset Request",
-                    Body = $"Please click the following link to reset your password: {callBackUrl}",
+                    Body = body,
                     Attachments = null
                 };
+
 
                 await _mailingServices.SendEmailAsync(mailRequest.ToEmail, mailRequest.Subject, mailRequest.Body, mailRequest.Attachments);
 
@@ -499,6 +652,36 @@ namespace Clinic_System.API.Controllers
             {
                 _logger.LogError(ex, "Error resetting password for: {Email}", request?.Email);
                 return StatusCode(500, new { Message = "An error occurred while resetting the password" });
+            }
+        }
+
+        [HttpGet("Logout")]
+        public IActionResult Logout()
+        {
+            try
+            {
+                // Clear the cookies
+                Response.Cookies.Delete("t", new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/"
+                });
+                Response.Cookies.Delete("rt", new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    Path = "/"
+                });
+
+                return Ok(new { Message = "Logout successful" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during logout");
+                return StatusCode(500, new { Message = "An error occurred during logout" });
             }
         }
     }

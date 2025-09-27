@@ -26,7 +26,7 @@ namespace Clinic_System.Infrastructure.Repositories
         }
 
         // Get All Doctors
-        public async Task<(List<DoctorInfo> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
         {
             var query = _db.Doctors
                 .Include(d => d.User)
@@ -38,7 +38,7 @@ namespace Clinic_System.Infrastructure.Repositories
             var doctors = await query
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(doctor => new DoctorInfo
+                .Select(doctor => new DoctorInfoDTO
                 {
                     Id = doctor.Id.ToString(),
                     UserId = doctor.User.Id,
@@ -65,7 +65,7 @@ namespace Clinic_System.Infrastructure.Repositories
         }
 
         // Get Doctor by UserId
-        public async Task<DoctorInfo?> GetDoctorByIdAsync(string userId)
+        public async Task<DoctorInfoDTO?> GetDoctorByIdAsync(string userId)
         {
             var doctor = await _db.Doctors
                 .Include(d => d.User)
@@ -75,7 +75,7 @@ namespace Clinic_System.Infrastructure.Repositories
 
             if (doctor == null) return null;
 
-            return new DoctorInfo
+            return new DoctorInfoDTO
             {
                 Id = doctor.Id.ToString(),
                 UserId = doctor.User.Id,
@@ -107,8 +107,6 @@ namespace Clinic_System.Infrastructure.Repositories
             {
                 return IdentityResult.Failed(new IdentityError { Description = "Doctor not found." });
             }
-
-            doctorFromDB.SpecialityId = doctorEdit.SpecialityId ?? doctorFromDB.SpecialityId;
 
             _db.Doctors.Update(doctorFromDB);
             var changes = await _db.SaveChangesAsync();
