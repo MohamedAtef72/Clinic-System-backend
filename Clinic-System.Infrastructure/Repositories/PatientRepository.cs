@@ -15,11 +15,17 @@ namespace Clinic_System.Infrastructure.Repositories
         {
             _db = db;
         }
-        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(string? searchName, int pageNumber, int pageSize)
         {
             var query = _db.Patients
                 .Include(p => p.User)
-                .Include(p => p.Appointments);
+                .Include(p => p.Appointments)
+                .AsQueryable();
+
+            if(!String.IsNullOrEmpty(searchName))
+            {
+                query = query.Where(a => a.User.UserName.Contains(searchName));
+            }
 
             var totalCount = await query.CountAsync();
 
@@ -52,9 +58,15 @@ namespace Clinic_System.Infrastructure.Repositories
                 .ToListAsync();
         }
         // Get Patient From DB
-        public async Task<Patient> GetPatientByIdAsync(string userId)
+        public async Task<Patient> GetPatientByIdAsync(Guid id)
         {
-            return await _db.Patients.FirstOrDefaultAsync(e => e.UserId == userId);
+            return await _db.Patients.Include(d => d.User)
+                .FirstOrDefaultAsync(e => e.Id == id);
+        }
+
+        public async Task<Patient> GetPatientByUserIdAsync(string userId)
+        {
+            return await _db.Patients.Include(d => d.User).FirstOrDefaultAsync(e => e.UserId == userId);
         }
 
         public async Task AddPatientAsync(Patient newPatient)
@@ -78,7 +90,7 @@ namespace Clinic_System.Infrastructure.Repositories
         // Update Patient Async
         public async Task<IdentityResult> UpdatePatientAsync(string userId, UserEditProfile PatientEdit)
         {
-            var patientFromDB = await GetPatientByIdAsync(userId);
+            var patientFromDB = await GetPatientByIdAsync(Guid.Parse(userId));
             if (patientFromDB == null)
             {
                 return IdentityResult.Failed(new IdentityError { Description = "Patient not found." });

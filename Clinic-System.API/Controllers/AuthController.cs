@@ -24,6 +24,7 @@ namespace Clinic_System.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IDoctorService _doctorService;
+        private readonly IPatientService _patientService;
         private readonly PatientRepository _patientRepository;
         private readonly ReceptionistRepository _receptionistRepository;
         private readonly IRegisterService _registerService;
@@ -44,6 +45,7 @@ namespace Clinic_System.API.Controllers
             ILogger<AuthController> logger,
             IMailingServices mailingServices,
             IDoctorService doctorService,
+            IPatientService patientService,
             AppDbContext context)
         {
             _patientRepository = patientRepository ?? throw new ArgumentNullException(nameof(patientRepository));
@@ -55,6 +57,7 @@ namespace Clinic_System.API.Controllers
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _mailingServices = mailingServices ?? throw new ArgumentNullException(nameof(mailingServices));
             _doctorService = doctorService ?? throw new ArgumentNullException(nameof(doctorService));
+            _patientService = patientService ?? throw new ArgumentNullException(nameof(patientService));
             _context = context;
         }
 
@@ -440,7 +443,7 @@ namespace Clinic_System.API.Controllers
                         userId, storedRefreshToken.ExpiryDate);
 
                     // Clean up expired token
-                    user.RefreshTokens.Remove(storedRefreshToken);
+                    storedRefreshToken.ExpiryDate = DateTime.UtcNow.AddDays(7);
                     await _userManager.UpdateAsync(user);
                     return Unauthorized(new { Message = "Refresh token expired" });
                 }
@@ -502,14 +505,31 @@ namespace Clinic_System.API.Controllers
             }
         }
         [HttpGet("Me")]
-        public IActionResult GetCurrentUser()
+        public async Task<IActionResult> GetCurrentUser()
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var role = User.FindFirst(ClaimTypes.Role)?.Value;
+                var id = "";
+                if(role == "Doctor")
+                {
+                    var doctor = await _doctorService.GetDoctorByUserIdAsync(userId);
+                    id = doctor.Id;
+                }else if(role == "Receptionist")
+                {
+                    var receptionist = await _receptionistRepository.GetReceptionistByUserIdAsync(userId);
+                    id = receptionist.Id.ToString();
+                }else if(role == "Patient")
+                {
+                    var patient = await _patientService.GetPatientByUserIdAsync(userId);
+                    id = patient.Id.ToString();
+                }
+                else
+                {
+                    id = userId;
+                }
                 var email = User.FindFirst(ClaimTypes.Email)?.Value;
-
                 Console.WriteLine($"JWT Authentication Status: {User.Identity.IsAuthenticated}");
                 Console.WriteLine($"UserId: {userId}, Role: {role}, Email: {email}");
 
@@ -518,7 +538,7 @@ namespace Clinic_System.API.Controllers
                     return Ok(new
                     {
                         Message = "User Retrieved Successfully",
-                        user = new { userId, role, email },
+                        user = new { userId, id, role, email },
                         isAuthenticated = true
                     });
                 }
@@ -568,7 +588,7 @@ namespace Clinic_System.API.Controllers
                 // URL encode the token and email for safety
                 var encodedToken = Uri.EscapeDataString(token);
                 var encodedEmail = Uri.EscapeDataString(email);
-                var callBackUrl = $"https://localhost:7242/ResetPassword?token={encodedToken}&email={encodedEmail}";
+                var callBackUrl = $"https://localhost:3000/reset-password?token={encodedToken}&email={encodedEmail}";
 
                 var body = $@"
                             <!DOCTYPE html>

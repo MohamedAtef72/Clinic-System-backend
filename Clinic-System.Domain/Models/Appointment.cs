@@ -22,6 +22,8 @@ namespace Clinic_System.Domain.Models
         [Required]
         public string AppointmentStatus { get; set; }
 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
         // Navigation
         public Patient Patient { get; set; }
         public Visit Visit { get; set; }

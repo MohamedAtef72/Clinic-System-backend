@@ -20,6 +20,7 @@ namespace Clinic_System.Infrastructure.Data
         public DbSet<Speciality> Specialities { get; set; }
         public DbSet<DoctorAvailability> DoctorAvailabilities { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<Rating> Rating { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -58,12 +59,6 @@ namespace Clinic_System.Infrastructure.Data
                 .HasOne(a => a.Patient)
                 .WithMany(p => p.Appointments)
                 .HasForeignKey(a => a.PatientId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.Entity<Appointment>()
-                .HasOne(a => a.Availability)
-                .WithOne()
-                .HasForeignKey<Appointment>(a => a.AvailabilityId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<DoctorAvailability>()

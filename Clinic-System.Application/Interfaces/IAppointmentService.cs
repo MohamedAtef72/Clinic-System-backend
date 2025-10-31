@@ -9,9 +9,9 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface IAppointmentService
     {
-        Task<IEnumerable<AppointmentDTO>> GetAllAppointmentsAsync();
-        Task<IEnumerable<AppointmentDTO>> GetAppointmentsByDoctorIdAsync(Guid doctorId);
-        Task<IEnumerable<AppointmentDTO>> GetAppointmentsByPatientIdAsync(Guid patientId);
+        Task<(List<AppointmentDTO> Appointments , int TotalCount)> GetAllAppointmentsAsync( string? status,int pageNumber , int pageSize);
+        Task<(List<AppointmentDTO> Appointments , int totalCount)> GetAppointmentsByDoctorIdAsync(string? status, Guid doctorId ,int pageNumber ,int pageSize, DateTime?startDate , DateTime? endDate);
+        Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAppointmentsByPatientIdAsync(string? status,Guid patientId, int pageNumber , int pageSize);
         Task<AppointmentDTO> GetAppointmentByIdAsync(int id);
         Task CreateAppointmentAsync(CreateAppointmentDTO dto);
         Task UpdateAppointmentStatusAsync(UpdateAppointmentDTO dto);

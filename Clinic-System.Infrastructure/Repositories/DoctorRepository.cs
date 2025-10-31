@@ -26,12 +26,19 @@ namespace Clinic_System.Infrastructure.Repositories
         }
 
         // Get All Doctors
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, int pageNumber, int pageSize)
         {
             var query = _db.Doctors
-                .Include(d => d.User)
-                .Include(d => d.Speciality)
-                .Include(d => d.Availabilities);
+                        .Include(d => d.User)
+                        .Include(d => d.Speciality)
+                        .Include(d => d.Availabilities)
+                        .AsQueryable();
+
+            if (!String.IsNullOrEmpty(searchName))
+            {
+                query = query 
+                .Where(d => d.User.UserName.Contains(searchName));
+            }
 
             var totalCount = await query.CountAsync();
 
@@ -64,8 +71,44 @@ namespace Clinic_System.Infrastructure.Repositories
             return (doctors, totalCount);
         }
 
-        // Get Doctor by UserId
-        public async Task<DoctorInfoDTO?> GetDoctorByIdAsync(string userId)
+        // Get Doctor by Id
+        public async Task<DoctorInfoDTO?> GetDoctorByIdAsync(Guid id)
+        {
+            var doctor = await _db.Doctors
+                .Include(d => d.User)
+                .Include(d => d.Speciality)
+                .Include(d => d.Availabilities)
+                .FirstOrDefaultAsync(e => e.Id == id);
+
+            if (doctor == null) return null;
+
+            return new DoctorInfoDTO
+            {
+                Id = doctor.Id.ToString(),
+                UserId = doctor.User.Id,
+                UserName = doctor.User.UserName,
+                Email = doctor.User.Email,
+                ConsulationPrice = doctor.ConsultationPrice,
+                Country = doctor.User.Country,
+                Gender = doctor.User.Gender,
+                ImagePath = doctor.User.ImagePath,
+                DateOfBirth = doctor.User.DateOfBirth,
+                RegisterDate = doctor.User.RegisterDate,
+                SpecialityId = doctor.SpecialityId,
+                SpecialityName = doctor.Speciality?.Name,
+                Availabilities = doctor.Availabilities
+                    .Select(a => new DoctorAvailabilityDTO
+                    {
+                        Id = a.Id,
+                        StartTime = a.StartTime,
+                        EndTime = a.EndTime,
+                        IsBooked = a.IsBooked
+                    }).ToList()
+            };
+        }
+
+        // Get Doctor By UserId
+        public async Task<DoctorInfoDTO?> GetDoctorByUserIdAsync(string userId)
         {
             var doctor = await _db.Doctors
                 .Include(d => d.User)
@@ -114,6 +157,20 @@ namespace Clinic_System.Infrastructure.Repositories
             return changes > 0
                 ? IdentityResult.Success
                 : IdentityResult.Failed(new IdentityError { Description = "No changes were made." });
+        }
+
+        // Update Price
+        public async Task<bool> UpdateDoctorPriceAsync(Guid doctorId, int price)
+        {
+            var doctor = await _db.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);
+
+            if (doctor == null)
+                return false;
+
+            doctor.ConsultationPrice = price;
+
+            await _db.SaveChangesAsync();
+            return true;
         }
     }
 }

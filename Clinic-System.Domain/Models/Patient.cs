@@ -16,6 +16,9 @@ namespace Clinic_System.Domain.Models
         [Required]
         public string MedicalHistory { get; set; }
 
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+
         // Navigation
         public ApplicationUser User { get; set; }
         public ICollection<Appointment> Appointments { get; set; }

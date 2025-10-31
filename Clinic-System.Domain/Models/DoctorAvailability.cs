@@ -18,6 +18,11 @@ namespace Clinic_System.Domain.Models
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
 
+        // recurrence
+        public string? RecurrencePattern { get; set; }   // "None", "Weekly", "BiWeekly", ...
+        public DateTime? RecurrenceEndDate { get; set; }
+        public Guid? SeriesId { get; set; } 
+
         public bool IsBooked { get; set; }
     }
 }

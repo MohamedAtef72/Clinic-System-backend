@@ -11,7 +11,7 @@ namespace Clinic_System.Application.DTO
         // From Users Table
         public string UserId { get; set; }
         public int SpecialityId { get; set; }
-
+        public int ConsulationPrice { get; set; }
         public string SpecialityName { get; set; }
         public List<DoctorAvailabilityDTO> Availabilities { get; set; }
         = new List<DoctorAvailabilityDTO>();

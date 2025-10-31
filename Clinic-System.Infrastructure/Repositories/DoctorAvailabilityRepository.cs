@@ -15,9 +15,10 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task AddAsync(DoctorAvailability availability)
         {
-            await _db.DoctorAvailabilities.AddAsync(availability);
+            _db.DoctorAvailabilities.Add(availability);
             await _db.SaveChangesAsync();
         }
+
 
         public async Task<IEnumerable<DoctorAvailability>> GetAllAsync()
         {
@@ -47,11 +48,16 @@ namespace Clinic_System.Infrastructure.Repositories
         public async Task DeleteAsync(int id)
         {
             var availability = await GetByIdAsync(id);
+
+            var appointments = _db.Appointments.Where(a => a.AvailabilityId == id);
+
             if (availability != null)
             {
+                _db.Appointments.RemoveRange(appointments);
                 _db.DoctorAvailabilities.Remove(availability);
                 await _db.SaveChangesAsync();
             }
+
         }
     }
 }

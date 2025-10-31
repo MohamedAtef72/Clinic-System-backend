@@ -18,11 +18,12 @@ namespace Clinic_System.API.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly UserRepository _userRepo;
         private readonly DoctorRepository _doctorRepo;
+        private readonly IPatientService _patientService;
         private readonly PatientRepository _patientRepo;
         private readonly ReceptionistRepository _receptionistRepo;
         private readonly IUserService _userService;
 
-        public UserController(UserManager<ApplicationUser> userManager, UserRepository userRepo, DoctorRepository doctorRepo, PatientRepository patientRepo, ReceptionistRepository receptionistRepo, IUserService userService)
+        public UserController(UserManager<ApplicationUser> userManager, UserRepository userRepo, DoctorRepository doctorRepo, PatientRepository patientRepo, ReceptionistRepository receptionistRepo, IUserService userService , IPatientService patientService)
         {
             _userManager = userManager;
             _userRepo = userRepo;
@@ -30,6 +31,7 @@ namespace Clinic_System.API.Controllers
             _patientRepo = patientRepo;
             _receptionistRepo = receptionistRepo;
             _userService = userService;
+            _patientService = patientService;
         }
 
         [HttpGet("UserProfile")]
@@ -52,7 +54,7 @@ namespace Clinic_System.API.Controllers
 
             if (userRole.Contains("Doctor", StringComparer.OrdinalIgnoreCase))
             {
-                var doctor = await _doctorRepo.GetDoctorByIdAsync(userId);
+                var doctor = await _doctorRepo.GetDoctorByUserIdAsync(userId);
                 if (doctor == null)
                     return NotFound(new { message = "Doctor details not found" });
 
@@ -65,7 +67,7 @@ namespace Clinic_System.API.Controllers
             }
             else if (userRole.Contains("Patient", StringComparer.OrdinalIgnoreCase))
             {
-                var patient = await _patientRepo.GetPatientByIdAsync(userId);
+                var patient = await _patientService.GetPatientByUserIdAsync(userId);
                 if (patient == null)
                     return NotFound(new { message = "Patient details not found" });
 
@@ -78,7 +80,7 @@ namespace Clinic_System.API.Controllers
             }
             else if (userRole.Contains("Receptionist", StringComparer.OrdinalIgnoreCase))
             {
-                var receptionist = await _receptionistRepo.GetReceptionistByIdAsync(userId);
+                var receptionist = await _receptionistRepo.GetReceptionistByUserIdAsync(userId);
                 if (receptionist == null)
                     return NotFound(new { message = "Receptionist details not found" });
 
@@ -148,7 +150,7 @@ namespace Clinic_System.API.Controllers
             }
             else if (role.Equals("Receptionist", StringComparison.OrdinalIgnoreCase))
             {
-                var resultReceptionistEdit = await _receptionistRepo.UpdateReceptionistAsync(userId,userEdit);
+                var resultReceptionistEdit = await _receptionistRepo.UpdateReceptionistAsync(Guid.Parse(userId),userEdit);
                 if (!resultReceptionistEdit.Succeeded)
                 {
                     return BadRequest(new { Message = "Update Receptionist Failed" });

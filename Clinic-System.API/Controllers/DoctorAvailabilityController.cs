@@ -120,7 +120,6 @@ namespace Clinic_System.API.Controllers
                 });
             }
         }
-
         [HttpPost("Add")]
         public async Task<IActionResult> AddAvailability([FromBody][Required] DoctorAvailabilityCreateDTO dto)
         {
@@ -130,50 +129,25 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Availability data is required" });
 
                 if (!ModelState.IsValid)
-                    return BadRequest(new { Message = "Invalid availability data", Errors = ModelState });
+                    return BadRequest(new { Message = "Invalid data", Errors = ModelState });
 
-                // Business logic validation
                 if (dto.StartTime >= dto.EndTime)
                     return BadRequest(new { Message = "Start time must be before end time" });
 
                 if (dto.DoctorId == Guid.Empty)
                     return BadRequest(new { Message = "Valid doctor ID is required" });
 
-                // Validate time ranges (e.g., within business hours)
-                if (dto.StartTime.TimeOfDay < TimeSpan.FromHours(6) || dto.EndTime.TimeOfDay > TimeSpan.FromHours(23))
-                    return BadRequest(new { Message = "Availability must be within reasonable hours (6 AM - 11 PM)" });
-
                 await _availabilityService.AddAvailabilityAsync(dto);
 
-                _logger.LogInformation("Doctor availability added successfully for Doctor: {DoctorId}",
-                    dto.DoctorId);
-
-                return Ok(
-                    new
-                    {
-                        Message = "Doctor availability added successfully",
-                    }
-                );
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogWarning(ex, "Invalid argument while adding availability");
-                return BadRequest(new { Message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogWarning(ex, "Operation conflict while adding availability");
-                return Conflict(new { Message = ex.Message });
+                return Ok(new { Message = "Doctor availability (including recurrence if any) added successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error adding doctor availability");
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while adding the availability"
-                });
+                _logger.LogError(ex, "Error adding availability");
+                return StatusCode(500, new { Message = ex.Message });
             }
         }
+
 
         [HttpPut("Update/{id}")]
         public async Task<IActionResult> Update(

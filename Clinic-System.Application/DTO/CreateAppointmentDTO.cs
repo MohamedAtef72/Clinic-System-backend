@@ -11,5 +11,6 @@ namespace Clinic_System.Application.DTO
         public Guid PatientId { get; set; }
         public int AvailabilityId { get; set; }
         public DateTime Date { get; set; }
+        public string AppointmentStatus { get; set; }
     }
 }
