@@ -21,16 +21,23 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAllAppointments()
+        public async Task<IActionResult> GetAllAppointments([FromQuery] string? status,[FromQuery]int pageNumber = 1 ,[FromQuery] int pageSize = 5)
         {
             try
             {
-                var appointments = await _service.GetAllAppointmentsAsync();
+                var (appointments , totalCount) = await _service.GetAllAppointmentsAsync(status,pageNumber , pageSize);
 
                 if (appointments == null || !appointments.Any())
                     return Ok(new { Message = "No appointments found.", Data = new List<object>() });
 
-                return Ok(new { Message = "Appointments retrieved successfully.", Data = appointments });
+                return Ok(new
+                {
+                    Message = "Appointments retrieved successfully",
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = appointments
+                });
             }
             catch (Exception ex)
             {
@@ -51,7 +58,7 @@ namespace Clinic_System.API.Controllers
                 if (appointment == null)
                     return NotFound(new { Message = $"Appointment with ID {id} not found" });
 
-                return Ok(new { Message = "Appointment retrieved successfully.", Data = appointment });
+                return Ok(new { Message = "Appointment retrieved successfully.", AppointmentData = appointment});
             }
             catch (Exception ex)
             {
@@ -90,7 +97,7 @@ namespace Clinic_System.API.Controllers
             }
         }
 
-        [HttpPut("{id}")]
+        [HttpPut("Update/{id}")]
         public async Task<IActionResult> UpdateAppointmentStatus(
             [Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id,
             [FromBody][Required] UpdateAppointmentDTO dto)
@@ -155,7 +162,9 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("doctor/{doctorId}")]
-        public async Task<IActionResult> GetAppointmentsByDoctorId([Required] Guid doctorId)
+        public async Task<IActionResult> GetAppointmentsByDoctorId([FromQuery] string? status, [Required] Guid doctorId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null)
         {
             try
             {
@@ -165,22 +174,31 @@ namespace Clinic_System.API.Controllers
                 if (doctorId == Guid.Empty)
                     return BadRequest(new { Message = "Doctor ID cannot be empty" });
 
-                var result = await _service.GetAppointmentsByDoctorIdAsync(doctorId);
+                var (appointments, totalCount) = await _service.GetAppointmentsByDoctorIdAsync(
+                    status,doctorId, pageNumber, pageSize, startDate, endDate);
 
                 return Ok(new
                 {
-                    Message = "Appointments retrieved successfully.",
-                    Data = result
+                    Message = "Appointments retrieved successfully",
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = appointments
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { Message = "An error occurred while retrieving appointments", Error = ex.Message });
+                return StatusCode(500, new
+                {
+                    Message = "An error occurred while retrieving appointments",
+                    Error = ex.Message
+                });
             }
         }
 
+
         [HttpGet("patient/{patientId}")]
-        public async Task<IActionResult> GetAppointmentsByPatientId([Required] Guid patientId)
+        public async Task<IActionResult> GetAppointmentsByPatientId([FromQuery] string? status, [Required] Guid patientId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5)
         {
             try
             {
@@ -190,12 +208,15 @@ namespace Clinic_System.API.Controllers
                 if (patientId == Guid.Empty)
                     return BadRequest(new { Message = "Patient ID cannot be empty" });
 
-                var result = await _service.GetAppointmentsByPatientIdAsync(patientId);
+                var (appointments , totalCount) = await _service.GetAppointmentsByPatientIdAsync(status,patientId , pageNumber , pageSize);
 
                 return Ok(new
                 {
-                    Message = "Appointments retrieved successfully.",
-                    Data = result
+                    Message = "Appointments retrieved successfully",
+                    TotalCount = totalCount,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    Data = appointments
                 });
             }
             catch (Exception ex)

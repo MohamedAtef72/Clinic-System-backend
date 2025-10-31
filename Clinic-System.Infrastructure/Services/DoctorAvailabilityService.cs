@@ -14,44 +14,76 @@ namespace Clinic_System.Application.Services
             _availabilityRepository = availabilityRepository;
         }
 
-        public async Task AddAvailabilityAsync(DoctorAvailabilityCreateDTO doctorCreateDTO)
+        public async Task AddAvailabilityAsync(DoctorAvailabilityCreateDTO dto)
         {
-            var availability = new DoctorAvailability
+            if (string.IsNullOrEmpty(dto.RecurrencePattern) || dto.RecurrencePattern == "None")
             {
-                DoctorId = doctorCreateDTO.DoctorId,
-                StartTime = doctorCreateDTO.StartTime,
-                EndTime = doctorCreateDTO.EndTime,
-                IsBooked = false
-            };
+                var singleAvailability = new DoctorAvailability
+                {
+                    DoctorId = dto.DoctorId,
+                    StartTime = dto.StartTime,
+                    EndTime = dto.EndTime,
+                    IsBooked = false,
+                    RecurrencePattern = "None"
+                };
 
-            await _availabilityRepository.AddAsync(availability);
+                await _availabilityRepository.AddAsync(singleAvailability);
+                return;
+            }
+
+            if (!dto.RecurrenceEndDate.HasValue)
+                throw new ArgumentException("RecurrenceEndDate is required when using a recurrence pattern.");
+
+            var currentStart = dto.StartTime;
+            var currentEnd = dto.EndTime;
+            var recurrenceId = Guid.NewGuid(); 
+
+            while (currentStart <= dto.RecurrenceEndDate.Value)
+            {
+                var availability = new DoctorAvailability
+                {
+                    DoctorId = dto.DoctorId,
+                    StartTime = currentStart,
+                    EndTime = currentEnd,
+                    IsBooked = false,
+                    RecurrencePattern = dto.RecurrencePattern,
+                    RecurrenceEndDate = dto.RecurrenceEndDate,
+                    SeriesId = recurrenceId
+                };
+
+                await _availabilityRepository.AddAsync(availability);
+
+                currentStart = dto.RecurrencePattern switch
+                {
+                    "Weekly" => currentStart.AddDays(7),
+                    "BiWeekly" => currentStart.AddDays(14),
+                    _ => currentStart.AddDays(7) 
+                };
+                currentEnd = currentStart.Add(dto.EndTime - dto.StartTime);
+            }
         }
 
         public async Task<IEnumerable<DoctorAvailabilityDTO>> GetAvailabilitiesByDoctorAsync(Guid doctorId)
         {
             var availabilities = await _availabilityRepository.GetByDoctorIdAsync(doctorId);
-            if (availabilities == null) return null;
-
             return availabilities.Select(a => new DoctorAvailabilityDTO
             {
                 Id = a.Id,
                 StartTime = a.StartTime,
                 EndTime = a.EndTime,
-                IsBooked = a.IsBooked
+                IsBooked = a.IsBooked,
             });
         }
 
         public async Task<IEnumerable<DoctorAvailabilityDTO>> GetAllAvailabilitiesAsync()
         {
             var availabilities = await _availabilityRepository.GetAllAsync();
-            if (availabilities == null) return null;
-
             return availabilities.Select(a => new DoctorAvailabilityDTO
             {
                 Id = a.Id,
                 StartTime = a.StartTime,
                 EndTime = a.EndTime,
-                IsBooked = a.IsBooked
+                IsBooked = a.IsBooked,
             });
         }
 
@@ -65,7 +97,7 @@ namespace Clinic_System.Application.Services
                 Id = availability.Id,
                 StartTime = availability.StartTime,
                 EndTime = availability.EndTime,
-                IsBooked = availability.IsBooked
+                IsBooked = availability.IsBooked,
             };
         }
 

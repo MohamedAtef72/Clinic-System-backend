@@ -25,13 +25,19 @@ namespace Clinic_System.Infrastructure.Repositories
         }
 
         // Get Receptionist From DB
-        public async Task<Receptionist> GetReceptionistByIdAsync(string userId)
+        public async Task<Receptionist> GetReceptionistByIdAsync(Guid id)
         {
-            return await _db.Receptionists.FirstOrDefaultAsync(e => e.UserId == userId);
+            return await _db.Receptionists.Include(d => d.User)
+                .FirstOrDefaultAsync(e => e.Id == id);
+        }
+        public async Task<Receptionist> GetReceptionistByUserIdAsync(string userId)
+        {
+            return await _db.Receptionists.Include(d => d.User)
+                .FirstOrDefaultAsync(e => e.UserId == userId);
         }
 
         // Update Receptionist Async
-        public async Task<IdentityResult> UpdateReceptionistAsync(string userId, UserEditProfile receptionEdit)
+        public async Task<IdentityResult> UpdateReceptionistAsync(Guid userId, UserEditProfile receptionEdit)
         {
             var receptionistFromDB = await GetReceptionistByIdAsync(userId);
             if (receptionistFromDB == null)

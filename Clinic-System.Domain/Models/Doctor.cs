@@ -20,6 +20,9 @@ namespace Clinic_System.Domain.Models
         [ForeignKey(nameof(Speciality))]
         public int SpecialityId { get; set; }
 
+        [Required]
+        public int ConsultationPrice { get; set; }
+
         // Navigation
         public ApplicationUser User { get; set; }
         public Speciality Speciality { get; set; }

@@ -12,8 +12,10 @@ namespace Clinic_System.Application.Interfaces
     public interface IDoctorService
     {
         Task AddDoctor(Doctor newDoctor);
-        Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize);
-        Task<DoctorInfoDTO> GetDoctorByIdAsync(string userId);
+        Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName,int pageNumber, int pageSize);
+        Task<DoctorInfoDTO> GetDoctorByIdAsync(Guid id);
+        Task<DoctorInfoDTO> GetDoctorByUserIdAsync(string userId);
         Task<IdentityResult> UpdateDoctorAsync(string userId, UserEditProfile doctorEdit);
+        Task<bool> UpdateDoctorPriceAsync(Guid doctorId, int price);
     }
 }

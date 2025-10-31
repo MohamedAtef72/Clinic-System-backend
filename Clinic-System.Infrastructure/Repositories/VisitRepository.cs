@@ -56,6 +56,7 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task UpdateAsync(Visit visit)
         {
+            _db.ChangeTracker.Clear();
             _db.Visits.Update(visit);
             await _db.SaveChangesAsync();
         }

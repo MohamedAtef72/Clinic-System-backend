@@ -20,19 +20,27 @@ namespace Clinic_System.Infrastructure.Services
             await _doctorRepo.AddDoctorAsync(newDoctor);
         }
 
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, int pageNumber, int pageSize)
         {
-            return await _doctorRepo.GetAllDoctorsAsync(pageNumber, pageSize);
+            return await _doctorRepo.GetAllDoctorsAsync(searchName,pageNumber, pageSize);
         }
 
-        public async Task<DoctorInfoDTO> GetDoctorByIdAsync(string userId)
+        public async Task<DoctorInfoDTO> GetDoctorByIdAsync(Guid id)
         {
-            return await _doctorRepo.GetDoctorByIdAsync(userId);
+            return await _doctorRepo.GetDoctorByIdAsync(id);
+        }
+        public async Task<DoctorInfoDTO> GetDoctorByUserIdAsync(string userId)
+        {
+            return await _doctorRepo.GetDoctorByUserIdAsync(userId);
         }
 
         public async Task<IdentityResult> UpdateDoctorAsync(string userId, UserEditProfile doctorEdit)
         {
             return await _doctorRepo.UpdateDoctorAsync(userId, doctorEdit);
+        }
+        public async Task<bool> UpdateDoctorPriceAsync(Guid doctorId, int price)
+        {
+            return await _doctorRepo.UpdateDoctorPriceAsync(doctorId, price);
         }
     }
 }

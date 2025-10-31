@@ -18,9 +18,9 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("GetAll")]
-        public async Task<IActionResult> GetAll(int pageNumber = 1, int pageSize = 5)
+        public async Task<IActionResult> GetAll(string? searchName, int pageNumber = 1, int pageSize = 5)
         {
-            var (patients , totalCount) = await _patientService.GetAllPatientsAsync(pageNumber,pageSize);
+            var (patients , totalCount) = await _patientService.GetAllPatientsAsync(searchName, pageNumber,pageSize);
             if(patients == null)
             {
                 return NotFound(new { Message = "Patients Not Found" });
@@ -32,8 +32,8 @@ namespace Clinic_System.API.Controllers
                 Data = patients});
         }
 
-        [HttpGet("Patient/{id}")]
-        public async Task<IActionResult> GetById(string id)
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(Guid id)
         {
             var patient = await _patientService.GetPatientByIdAsync(id);
             if (patient == null) return NotFound();

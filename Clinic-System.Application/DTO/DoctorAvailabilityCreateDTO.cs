@@ -11,5 +11,7 @@ namespace Clinic_System.Application.DTO
         public Guid DoctorId { get; set; }
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
+        public string? RecurrencePattern { get; set; }  // "None", "Weekly", "BiWeekly"
+        public DateTime? RecurrenceEndDate { get; set; }
     }
 }

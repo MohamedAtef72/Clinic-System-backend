@@ -8,7 +8,8 @@ namespace Clinic_System.Infrastructure.Services
     {
         public MappingProfile()
         {
-            CreateMap<Appointment, AppointmentDTO>();
+            CreateMap<Appointment, AppointmentDTO>()
+                .ForMember(dest => dest.DoctorId, opt => opt.MapFrom(src => src.Availability.DoctorId));
             CreateMap<AppointmentDTO, Appointment>();
             CreateMap<Visit, VisitReadDTO>();
             CreateMap<VisitCreateDTO, Visit>();

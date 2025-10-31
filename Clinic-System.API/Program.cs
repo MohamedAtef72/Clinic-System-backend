@@ -39,6 +39,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
     options.Password.RequireNonAlphanumeric = true; // Requires at least one special character (e.g., !, @, #)
     options.Password.RequireUppercase = true;       // Requires at least one uppercase letter (A-Z)
     options.Password.RequireLowercase = true;       // Requires at least one lowercase letter (a-z)
+
+    // -- Username settings
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ ";
 })
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
@@ -48,6 +51,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Injection
+// Repository
 builder.Services.AddScoped<DoctorRepository>();
 builder.Services.AddScoped<PatientRepository>();
 builder.Services.AddScoped<ReceptionistRepository>();
@@ -56,7 +60,9 @@ builder.Services.AddScoped<SpecialityRepository>();
 builder.Services.AddScoped<DoctorAvailabilityRepository>();
 builder.Services.AddScoped<AppointmentRepository>();
 builder.Services.AddScoped<VisitRepository>();
-
+builder.Services.AddScoped<RatingRepository>();
+builder.Services.AddScoped<AdminRepository>();
+// Interfaces
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -67,6 +73,8 @@ builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
+builder.Services.AddScoped<IRatingService, RatingService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
 
 
 // JWT Authentication
