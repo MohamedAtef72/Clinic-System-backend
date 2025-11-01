@@ -3,17 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35222.181
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clinic-System.API", "Clinic-System.API\Clinic-System.API.csproj", "{BFEA40F5-8AD6-458B-BB51-3A015955EAC7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clinic-System.API", "Clinic-System.API\Clinic-System.API.csproj", "{BFEA40F5-8AD6-458B-BB51-3A015955EAC7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clinic-System.Domain", "Clinic-System.Domain\Clinic-System.Domain.csproj", "{53B5C827-6F40-4FEF-8C0C-63B81B42AE2E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clinic-System.Domain", "Clinic-System.Domain\Clinic-System.Domain.csproj", "{53B5C827-6F40-4FEF-8C0C-63B81B42AE2E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clinic-System.Application", "Clinic-System.Application\Clinic-System.Application.csproj", "{CD5AD4DD-2749-474A-B6D0-9D2ACC28D5B3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clinic-System.Application", "Clinic-System.Application\Clinic-System.Application.csproj", "{CD5AD4DD-2749-474A-B6D0-9D2ACC28D5B3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Clinic-System.Infrastructure", "Clinic-System.Infrastructure\Clinic-System.Infrastructure.csproj", "{5BDB6A4B-0527-4E4F-8606-EDFECC6B92AD}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Clinic-System.Infrastructure", "Clinic-System.Infrastructure\Clinic-System.Infrastructure.csproj", "{5BDB6A4B-0527-4E4F-8606-EDFECC6B92AD}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{02AE3A9C-16CF-42C2-89BF-CF2F0F44FD94}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
+		Dockerfile = Dockerfile
 	EndProjectSection
 EndProject
 Global

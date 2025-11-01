@@ -165,18 +165,19 @@ builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
 
-// Add CORS
+var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp",
-        policy =>
-        {
-            policy.WithOrigins("https://localhost:3000") // React app URL
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials(); 
-        });
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins(allowedOrigin)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
 });
+
 
 
 
@@ -186,7 +187,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
 
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     await RoleSeederService.SeedAsync(roleManager);
