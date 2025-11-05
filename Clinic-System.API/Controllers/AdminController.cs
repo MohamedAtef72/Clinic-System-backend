@@ -8,7 +8,7 @@ namespace Clinic_System.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
@@ -19,7 +19,6 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("Dashboard")]
-        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetDashboardInfo()
         {
             try

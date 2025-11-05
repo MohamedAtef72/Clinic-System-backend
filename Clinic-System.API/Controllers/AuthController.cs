@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity.Data;
 using Newtonsoft.Json.Linq;
 using Sprache;
+using Clinic_System.Domain.Constant;
 
 namespace Clinic_System.API.Controllers
 {
@@ -62,6 +63,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("DoctorRegister")]
+        [Authorize(Roles = Role.Admin)]
         public async Task<IActionResult> DoctorRegister([FromForm][Required] DoctorRegisterDTO doctorRegister)
         {
             try
@@ -588,7 +590,9 @@ namespace Clinic_System.API.Controllers
                 // URL encode the token and email for safety
                 var encodedToken = Uri.EscapeDataString(token);
                 var encodedEmail = Uri.EscapeDataString(email);
-                var callBackUrl = $"https://localhost:3000/reset-password?token={encodedToken}&email={encodedEmail}";
+                var frontendUrl = _config["Frontend:BaseUrl"];
+                var callBackUrl = $"{frontendUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
+
 
                 var body = $@"
                             <!DOCTYPE html>

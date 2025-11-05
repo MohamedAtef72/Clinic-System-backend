@@ -2,6 +2,7 @@
 using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection.Emit;
 
 namespace Clinic_System.Infrastructure.Data
 {

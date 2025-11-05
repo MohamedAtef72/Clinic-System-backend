@@ -24,11 +24,14 @@ namespace Clinic_System.Infrastructure.Services
         public async Task<Speciality?> GetByIdAsync(int id)
             => await _repo.GetByIdAsync(id);
 
-        public async Task<Speciality> CreateAsync(Speciality speciality)
+        public async Task CreateAsync(Speciality speciality)
         {
-            await _repo.AddAsync(speciality);
+            var newModel = new Speciality()
+            {
+                Name = speciality.Name,
+            };
+            await _repo.AddAsync(newModel);
             await _repo.SaveChangesAsync();
-            return speciality;
         }
 
         public async Task<bool> UpdateAsync(int id, Speciality speciality)

@@ -11,7 +11,7 @@ namespace Clinic_System.Application.Interfaces
     {
         Task<IList<Speciality>> GetAllAsync();
         Task<Speciality?> GetByIdAsync(int id);
-        Task<Speciality> CreateAsync(Speciality speciality);
+        Task CreateAsync(Speciality speciality);
         Task<bool> UpdateAsync(int id, Speciality speciality);
         Task<bool> DeleteAsync(int id);
     }
