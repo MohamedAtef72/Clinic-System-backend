@@ -43,34 +43,55 @@ namespace Clinic_System.API.Controllers
             return Ok(new { Message = "Speciality retrieved successfully", Data = speciality });
         }
 
-        [HttpPost]
+        [HttpPost()]
         [Authorize(Roles = Role.Admin)]
         public async Task<IActionResult> Create([FromBody] SpecialityInfo specialityInfo)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var speciality = new Speciality
+            try
             {
-                Name = specialityInfo.Name,
-            };
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
 
-            var created = await _service.CreateAsync(speciality);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+                var speciality = new Speciality
+                {
+                    Name = specialityInfo.Name,
+                };
+
+                await _service.CreateAsync(speciality);
+                return Ok(new { Message = "Speciality Created Successfully"});
+
+            }catch(Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Message = "An unexpected error occurred while add Speciality.",
+                    Error = ex.Message
+                });
+            }
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = Role.Admin)]
         public async Task<IActionResult> Update(int id, [FromBody] Speciality speciality)
         {
-            if (id != speciality.Id)
-                return BadRequest("ID mismatch");
+            try
+            {
+                if (id != speciality.Id)
+                    return BadRequest("ID mismatch");
 
-            var updated = await _service.UpdateAsync(id, speciality);
-            if (!updated)
-                return NotFound();
+                var updated = await _service.UpdateAsync(id, speciality);
+                if (!updated)
+                    return NotFound();
 
-            return NoContent();
+                return NoContent();
+            }catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    Message = "An unexpected error occurred while update Speciality.",
+                    Error = ex.Message
+                });
+            }
         }
 
         [HttpDelete("{id}")]
@@ -85,7 +106,11 @@ namespace Clinic_System.API.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return BadRequest(new
+                {
+                    Message = "An unexpected error occurred while delete Speciality.",
+                    Error = ex.Message
+                });
             }
         }
     }

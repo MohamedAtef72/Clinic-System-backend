@@ -178,9 +178,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-
-
 var app = builder.Build();
 
 // Seeder Services

@@ -16,6 +16,9 @@ RUN dotnet publish "Clinic-System.API.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-COPY ["Clinic-System.API/.env", "."]       
+COPY ["Clinic-System.API/.env", "."]
+
 ENV ASPNETCORE_URLS=http://+:8080
+
 ENTRYPOINT ["dotnet", "Clinic-System.API.dll"]
+
