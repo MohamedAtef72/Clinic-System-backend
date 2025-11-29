@@ -2,7 +2,7 @@
 
 This is the **backend** service for the Clinic System project.  
 It provides all API endpoints for managing doctors, patients, appointments, and ratings.  
-Built with **ASP.NET Core Web API**, it follows **Clean Architecture** and **N-Tier Design Pattern** for scalability and maintainability.
+Built with **ASP.NET Core Web API**, it follows **Clean Architecture** for scalability and maintainability.
 
 ---
 
@@ -148,18 +148,6 @@ ENTRYPOINT ["dotnet", "Clinic-System.API.dll"]
 
 > ⚠️ Note: Ensure that the **database is running** and all **EF Core migrations are applied** for the API to function correctly.
 
----
-
-## 🧪 Testing
-To run the tests:
-```bash
-dotnet test
-```
-
----
-
-## 📜 License
-This project is licensed under the **MIT License**.
 
 ---
 
