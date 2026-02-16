@@ -13,6 +13,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Clinic_System.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Clinic_System.API.Hubs;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -62,6 +63,7 @@ builder.Services.AddScoped<AppointmentRepository>();
 builder.Services.AddScoped<VisitRepository>();
 builder.Services.AddScoped<RatingRepository>();
 builder.Services.AddScoped<AdminRepository>();
+builder.Services.AddScoped<NotificationRepository>();
 // Interfaces
 builder.Services.AddScoped<IUserService,UserService>();
 builder.Services.AddScoped<IRegisterService,RegisterService>();
@@ -75,6 +77,11 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
 builder.Services.AddScoped<IRatingService, RatingService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>();
+builder.Services.AddScoped<NotificationRepository>();
+// appointment repo and service already registered earlier; ensure correct signatures for DI
 
 
 // JWT Authentication
@@ -202,10 +209,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseIpRateLimiting();
 app.UseCors("AllowReactApp");
+//app.UseIpRateLimiting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ClinicHub>("/clinicHub");
 
 app.Run();

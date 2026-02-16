@@ -172,5 +172,12 @@ namespace Clinic_System.Infrastructure.Repositories
             await _db.SaveChangesAsync();
             return true;
         }
+
+        // Get the ApplicationUser Id for a given doctor Id
+        public async Task<string?> GetUserIdByDoctorIdAsync(Guid doctorId)
+        {
+            var doctor = await _db.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);
+            return doctor?.UserId;
+        }
     }
 }

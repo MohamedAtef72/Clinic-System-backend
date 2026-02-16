@@ -22,6 +22,8 @@ namespace Clinic_System.Infrastructure.Data
         public DbSet<DoctorAvailability> DoctorAvailabilities { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Rating> Rating { get; set; }
+        public DbSet<Clinic_System.Domain.Models.Notification> Notifications { get; set; }
+        public DbSet<Clinic_System.Domain.Models.UserNotification> UserNotifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -72,6 +74,35 @@ namespace Clinic_System.Infrastructure.Data
                 .HasOne(v => v.Appointment)
                 .WithOne(a => a.Visit)
                 .HasForeignKey<Visit>(v => v.AppointmentId);
+
+            builder.Entity<Clinic_System.Domain.Models.Notification>(b =>
+            {
+                b.HasKey(n => n.Id);
+                b.Property(n => n.Title).IsRequired();
+                b.Property(n => n.Message).IsRequired();
+                b.Property(n => n.IsGlobal).HasDefaultValue(false);
+                b.Property(n => n.CreatedAt).HasColumnType("datetime2");
+            });
+            builder.Entity<Notification>()
+                .HasIndex(un => un.CreatedAt);
+
+            builder.Entity<UserNotification>(b =>
+            {
+                b.HasKey(un => un.Id);
+
+                b.HasOne(un => un.Notification)
+                 .WithMany(n => n.UserNotifications) 
+                 .HasForeignKey(un => un.NotificationId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                b.Property(un => un.UserId).IsRequired();
+                b.Property(un => un.IsRead).HasDefaultValue(false);
+            });
+            builder.Entity<UserNotification>()
+                 .HasIndex(un => un.UserId);
+
+            builder.Entity<UserNotification>()
+                .HasIndex(un => un.NotificationId);
         }
     }
 

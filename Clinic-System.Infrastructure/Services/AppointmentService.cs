@@ -13,13 +13,19 @@ namespace Clinic_System.Infrastructure.Services
         private readonly AppointmentRepository _appointmentRepository;
         private readonly DoctorAvailabilityRepository _doctorAvailabilityRepository;
         private readonly IMapper _mapper;
+        private readonly INotificationQueryService _notificationQueryService;
+        private readonly INotificationService _notificationService;
+        private readonly DoctorRepository _doctorRepository;
 
 
-        public AppointmentService(AppointmentRepository appointmentRepository , IMapper mapper, DoctorAvailabilityRepository doctorAvailabilityRepository)
+        public AppointmentService(AppointmentRepository appointmentRepository , IMapper mapper, DoctorAvailabilityRepository doctorAvailabilityRepository, DoctorRepository doctorRepository, INotificationService notificationService, INotificationQueryService notificationQueryService)
         {
             _appointmentRepository = appointmentRepository;
             _mapper = mapper;
             _doctorAvailabilityRepository = doctorAvailabilityRepository;
+            _notificationQueryService = notificationQueryService;
+            _notificationService = notificationService;
+            _doctorRepository = doctorRepository;
         }
 
         public async Task<(List<AppointmentDTO> Appointments, int TotalCount)> GetAllAppointmentsAsync( string? status, int pageNumber, int pageSize)
@@ -81,6 +87,21 @@ namespace Clinic_System.Infrastructure.Services
                 await _doctorAvailabilityRepository.UpdateAsync(availability);
 
                 await transaction.CommitAsync();
+                // Create notification for the doctor (persist notification and a user-notification)
+                var doctorUserId = await _doctorRepository.GetUserIdByDoctorIdAsync(availability.DoctorId);
+                var doctorId = doctorUserId ?? availability.DoctorId.ToString();
+                var notification = new Clinic_System.Domain.Models.Notification
+                {
+                    Title = "AppointmentBooked",
+                    Message = $"You have a new appointment on {dto.Date:yyyy-MM-dd HH:mm}",
+                    IsGlobal = false,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _notificationQueryService.CreateNotificationForUserAsync(doctorId, notification);
+
+                // Send real-time notification to the doctor user
+                await _notificationService.SendNotificationToUser(doctorId, notification.Title, notification.Message, "AppointmentBooked");
             }
             catch
             {
@@ -109,6 +130,19 @@ namespace Clinic_System.Infrastructure.Services
             }
 
             await _appointmentRepository.UpdateAsync(appointment);
+
+            // Notify doctor about status change
+            var doctorUserId = await _doctorRepository.GetUserIdByDoctorIdAsync(appointment.Availability.DoctorId);
+            var doctorId = doctorUserId ?? appointment.Availability.DoctorId.ToString();
+            var notification2 = new Clinic_System.Domain.Models.Notification
+            {
+                Title = "Appointment Status Updated",
+                Message = $"Appointment {appointment.Date} status changed to {appointment.AppointmentStatus}.",
+                IsGlobal = false,
+                CreatedAt = DateTime.UtcNow
+            };
+            await _notificationQueryService.CreateNotificationForUserAsync(doctorId, notification2);
+            await _notificationService.SendNotificationToUser(doctorId, notification2.Title, notification2.Message, "AppointmentStatusChanged");
         }
 
 
