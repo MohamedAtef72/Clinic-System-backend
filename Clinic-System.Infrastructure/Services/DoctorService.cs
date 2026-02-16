@@ -9,15 +9,35 @@ namespace Clinic_System.Infrastructure.Services
     public class DoctorService : IDoctorService
     {
         private readonly DoctorRepository _doctorRepo;
+        private readonly INotificationService _notificationService;
+        private readonly INotificationQueryService _notificationQueryService;
 
-        public DoctorService(DoctorRepository doctorRepo)
+        public DoctorService(DoctorRepository doctorRepo, INotificationService notificationService, INotificationQueryService notificationQueryService)
         {
             _doctorRepo = doctorRepo;
+            _notificationService = notificationService;
+            _notificationQueryService = notificationQueryService;
         }
 
         public async Task AddDoctor(Doctor newDoctor)
         {
             await _doctorRepo.AddDoctorAsync(newDoctor);
+
+            // Create notification in DB
+            var userIdInfo = !string.IsNullOrEmpty(newDoctor.User.UserName) ? newDoctor.User.UserName : newDoctor.User.UserName;
+            var message = $"A new doctor was added (UserName: {userIdInfo}).";
+            var notification = new Clinic_System.Domain.Models.Notification
+            {
+                Title = "New Doctor Added",
+                Message = message,
+                IsGlobal = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _notificationQueryService.CreateGlobalNotificationAsync(notification);
+
+            // Send real-time notification to all connected clients
+            await _notificationService.SendNotificationToAll(notification.Title, notification.Message, "DoctorAdded");
         }
 
         public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, int pageNumber, int pageSize)
