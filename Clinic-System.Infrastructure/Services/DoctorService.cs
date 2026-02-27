@@ -11,12 +11,14 @@ namespace Clinic_System.Infrastructure.Services
         private readonly DoctorRepository _doctorRepo;
         private readonly INotificationService _notificationService;
         private readonly INotificationQueryService _notificationQueryService;
+        private readonly Clinic_System.Application.Interfaces.ICacheService _cache;
 
-        public DoctorService(DoctorRepository doctorRepo, INotificationService notificationService, INotificationQueryService notificationQueryService)
+        public DoctorService(DoctorRepository doctorRepo, INotificationService notificationService, INotificationQueryService notificationQueryService, Clinic_System.Application.Interfaces.ICacheService cache)
         {
             _doctorRepo = doctorRepo;
             _notificationService = notificationService;
             _notificationQueryService = notificationQueryService;
+            _cache = cache;
         }
 
         public async Task AddDoctor(Doctor newDoctor)
@@ -35,6 +37,9 @@ namespace Clinic_System.Infrastructure.Services
             };
 
             await _notificationQueryService.CreateGlobalNotificationAsync(notification);
+
+            // Invalidate doctors list cache so clients will fetch updated list
+            await _cache.BumpVersionAsync("doctors:list");
 
             // Send real-time notification to all connected clients
             await _notificationService.SendNotificationToAll(notification.Title, notification.Message, "DoctorAdded");
