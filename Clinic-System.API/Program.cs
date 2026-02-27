@@ -14,6 +14,7 @@ using System.Text;
 using Clinic_System.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Clinic_System.API.Hubs;
+using StackExchange.Redis;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -71,6 +72,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
 builder.Services.AddScoped<ISpecialityService, SpecialityService>();
 builder.Services.AddScoped<IDoctorService,DoctorService>();
+builder.Services.AddScoped<DoctorService>();
 builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -81,6 +83,10 @@ builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>();
 builder.Services.AddScoped<NotificationRepository>();
+// Redis and caching
+var redisConn = builder.Configuration["Redis__Connection"] ?? "redis:6379";
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect(redisConn));
+builder.Services.AddScoped<Clinic_System.Application.Interfaces.ICacheService, Clinic_System.Infrastructure.Services.RedisCacheService>();
 // appointment repo and service already registered earlier; ensure correct signatures for DI
 
 

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: clinic_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: clinic_sqlserver
+    environment:
+      - SA_PASSWORD=StrongPassword123!
+      - ACCEPT_EULA=Y
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+  clinic_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clinic-system-api:latest
+    container_name: clinic_api
+    ports:
+      - "5000:8080"
+    depends_on:
+      - redis
+      - db
+    env_file:
+      - ./Clinic-System.API/.env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    volumes:
+      - ./:/src
+
+volumes:
+  redis_data:
+  mssql_data:
