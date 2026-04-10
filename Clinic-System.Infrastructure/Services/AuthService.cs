@@ -28,6 +28,10 @@ namespace Clinic_System.Infrastructure.Services
 
         public async Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress)
         {
+            // Prevent token generation for deleted (deactivated) users
+            if (user.IsDeleted)
+                throw new InvalidOperationException("User account is deactivated and cannot login.");
+
             // Get user claims and roles for complete token generation
             var userClaims = await _userManager.GetClaimsAsync(user);
             var roles = await _userManager.GetRolesAsync(user);

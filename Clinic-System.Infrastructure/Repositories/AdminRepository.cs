@@ -19,10 +19,15 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task<(int doctorsCount , int patientsCount, int appointmentCount)> GetInfo()
         {
-            var doctorsCount = await _context.Doctors.CountAsync();
+            // Count all doctors
+            var doctorsCount = await _context.Doctors
+                .CountAsync();
 
-            var patientsCount = await _context.Patients.CountAsync();
+            // Count all patients 
+            var patientsCount = await _context.Patients
+                .CountAsync();
 
+            // Count appointments (auto-filtered by global query filter for IsDeleted)
             var appointmentCount = await _context.Appointments.CountAsync();
 
             return (doctorsCount, patientsCount, appointmentCount);
@@ -33,9 +38,12 @@ namespace Clinic_System.Infrastructure.Repositories
             var today = DateTime.UtcNow.Date;
             var tomorrow = today.AddDays(1);
 
+            // Count new patients created today (excluding deactivated users)
             var newPatientsToday = await _context.Patients
-                .CountAsync(p => p.CreatedAt >= today && p.CreatedAt < tomorrow);
+                .Where(p => !p.User.IsDeleted && p.CreatedAt >= today && p.CreatedAt < tomorrow)
+                .CountAsync();
 
+            // Count appointments created today (auto-filtered by global query filter for IsDeleted)
             var appointmentsToday = await _context.Appointments
                 .CountAsync(a => a.CreatedAt >= today && a.CreatedAt < tomorrow);
 

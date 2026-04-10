@@ -22,8 +22,9 @@ namespace Clinic_System.API.Controllers
         private readonly PatientRepository _patientRepo;
         private readonly ReceptionistRepository _receptionistRepo;
         private readonly IUserService _userService;
+        private readonly Clinic_System.Application.Interfaces.ICacheService _cache;
 
-        public UserController(UserManager<ApplicationUser> userManager, UserRepository userRepo, DoctorRepository doctorRepo, PatientRepository patientRepo, ReceptionistRepository receptionistRepo, IUserService userService , IPatientService patientService)
+        public UserController(UserManager<ApplicationUser> userManager, UserRepository userRepo, DoctorRepository doctorRepo, PatientRepository patientRepo, ReceptionistRepository receptionistRepo, IUserService userService , IPatientService patientService, Clinic_System.Application.Interfaces.ICacheService cache)
         {
             _userManager = userManager;
             _userRepo = userRepo;
@@ -32,6 +33,7 @@ namespace Clinic_System.API.Controllers
             _receptionistRepo = receptionistRepo;
             _userService = userService;
             _patientService = patientService;
+            _cache = cache;
         }
 
         [HttpGet("UserProfile")]
@@ -121,7 +123,11 @@ namespace Clinic_System.API.Controllers
 
             if (!result.Succeeded)
             {
-                return BadRequest(new { Message = "Update failed."});
+                return BadRequest(new
+                {
+                    Message = "Update failed.",
+                    Errors = result.Errors.Select(e => e.Description)
+                });
             }
 
             // Get role
@@ -145,7 +151,9 @@ namespace Clinic_System.API.Controllers
                 var resultPatientEdit = await _patientRepo.UpdatePatientAsync(userId, userEdit);
                 if (!resultPatientEdit.Succeeded)
                 {
-                    return BadRequest(new { Message = "Update Patient Failed" });
+                    return BadRequest(new { Message = "Update Patient Failed",
+                        Errors = resultPatientEdit.Errors.Select(e => e.Description)
+                    });
                 }
             }
             else if (role.Equals("Receptionist", StringComparison.OrdinalIgnoreCase))
@@ -164,10 +172,32 @@ namespace Clinic_System.API.Controllers
         [Authorize(Roles = Role.Admin)]
         public async Task<IActionResult> DeleteProfile(string id)
         {
+            // Get user roles before deletion
+            var user = await _userManager.FindByIdAsync(id);
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+
+            // Perform soft delete
             var result = await _userService.DeleteUserWithRelatedDataAsync(id);
 
             if (result.Succeeded)
-                return Ok(new { message = "User deleted successfully" });
+            {
+                // Invalidate cache for deleted doctor
+                if (userRoles.Contains("Doctor", StringComparer.OrdinalIgnoreCase))
+                {
+                    await _cache.BumpVersionAsync("doctors:list");
+                }
+
+                // Invalidate cache for deleted patient if needed
+                if (userRoles.Contains("Patient", StringComparer.OrdinalIgnoreCase))
+                {
+                    await _cache.BumpVersionAsync("patients:list");
+                }
+
+                return Ok(new { message = "User deleted successfully and cache invalidated" });
+            }
 
             return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
         }

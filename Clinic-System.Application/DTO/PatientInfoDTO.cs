@@ -12,5 +12,6 @@ namespace Clinic_System.Application.DTO
         public string UserId { get; set; }
         public string BloodType { get; set; }
         public string MedicalHistory { get; set; }
+        public bool IsDeleted { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Clinic_System.Application.DTO;
+using Clinic_System.Domain.Models;
 
 namespace Clinic_System.Application.Interfaces
 {
@@ -11,5 +12,7 @@ namespace Clinic_System.Application.Interfaces
         Task<DoctorAvailabilityDTO?> GetAvailabilityByIdAsync(int id);
         Task UpdateAvailabilityAsync(int id, DateTime startTime, DateTime endTime);
         Task DeleteAvailabilityAsync(int id);
+        Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId);
+        void RemoveRange(List<DoctorAvailability> availabilities);
     }
 }

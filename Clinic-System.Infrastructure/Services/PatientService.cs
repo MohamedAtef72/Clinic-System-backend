@@ -2,6 +2,7 @@
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Identity;
 
 namespace Clinic_System.Application.Services
 {
@@ -59,5 +60,43 @@ namespace Clinic_System.Application.Services
                 MedicalHistory = patient.MedicalHistory,
             };
         }
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, int pageNumber, int pageSize)
+        {
+            return await _patientRepository.GetAllPatientsWithDeletedAsync(searchName, pageNumber, pageSize);
+        }
+
+        public async Task<Patient> EnsurePatientExistsOrRestoreAsync(string userId, string bloodType, string medicalHistory)
+        {
+            var patient = await _patientRepository.GetByUserIdAsync(userId, includeDeleted: true);
+
+            if (patient != null)
+            {
+                // Business logic
+                patient.BloodType = bloodType;
+                patient.MedicalHistory = medicalHistory;
+
+                await _patientRepository.SaveChanges();
+
+                return patient;
+            }
+
+            return await AddPatient(userId, bloodType, medicalHistory);
+        }
+
+        public async Task<Patient> AddPatient(string userId, string bloodType, string medicalHistory)
+        {
+            var patient = new Patient
+            {
+                UserId = userId,
+                BloodType = bloodType,
+                MedicalHistory = medicalHistory
+            };
+
+            await _patientRepository.AddPatient(patient);
+            return patient;
+        }
+
+        public async Task<IdentityResult> UpdatePatientAsync(string userId, UserEditProfile patientEdit)
+            => await _patientRepository.UpdatePatientAsync(userId, patientEdit);
     }
 }

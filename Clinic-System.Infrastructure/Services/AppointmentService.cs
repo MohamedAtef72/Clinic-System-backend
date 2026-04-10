@@ -2,7 +2,9 @@
 using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
+using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Org.BouncyCastle.Crypto;
 using System.Reflection.Metadata.Ecma335;
 
@@ -16,9 +18,10 @@ namespace Clinic_System.Infrastructure.Services
         private readonly INotificationQueryService _notificationQueryService;
         private readonly INotificationService _notificationService;
         private readonly DoctorRepository _doctorRepository;
+        private readonly AppDbContext _db;
 
 
-        public AppointmentService(AppointmentRepository appointmentRepository , IMapper mapper, DoctorAvailabilityRepository doctorAvailabilityRepository, DoctorRepository doctorRepository, INotificationService notificationService, INotificationQueryService notificationQueryService)
+        public AppointmentService(AppointmentRepository appointmentRepository , IMapper mapper, DoctorAvailabilityRepository doctorAvailabilityRepository, DoctorRepository doctorRepository, INotificationService notificationService, INotificationQueryService notificationQueryService, AppDbContext db)
         {
             _appointmentRepository = appointmentRepository;
             _mapper = mapper;
@@ -26,6 +29,7 @@ namespace Clinic_System.Infrastructure.Services
             _notificationQueryService = notificationQueryService;
             _notificationService = notificationService;
             _doctorRepository = doctorRepository;
+            _db = db;
         }
 
         public async Task<(List<AppointmentDTO> Appointments, int TotalCount)> GetAllAppointmentsAsync( string? status, int pageNumber, int pageSize)
@@ -55,11 +59,26 @@ namespace Clinic_System.Infrastructure.Services
             if (availability == null)
                 throw new ArgumentException("Invalid availability ID.");
 
-            // Chec For Is Not Booked
+            // Check if availability is active
+            if (!availability.IsActive)
+                throw new InvalidOperationException("This availability slot is no longer active.");
+
+            // Check if Doctor is deactivated
+            if (availability.Doctor.User.IsDeleted)
+                throw new InvalidOperationException("The doctor for this slot is no longer active.");
+
+            // Check if Slot is booked
             if (availability.IsBooked)
                 throw new InvalidOperationException("This slot is already booked.");
 
-            // Check For Have Old Appointment with same id
+            // Check if Patient is deactivated
+            var patient = await _db.Patients
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.Id == dto.PatientId);
+            if (patient == null || patient.User.IsDeleted)
+                throw new InvalidOperationException("Patient is no longer active or does not exist.");
+
+            // Check For Old Appointment with same availability
             var existingAppointment = await _appointmentRepository
                 .GetByAvailabilityIdAsync(dto.AvailabilityId);
 
@@ -87,6 +106,7 @@ namespace Clinic_System.Infrastructure.Services
                 await _doctorAvailabilityRepository.UpdateAsync(availability);
 
                 await transaction.CommitAsync();
+
                 // Create notification for the doctor (persist notification and a user-notification)
                 var doctorUserId = await _doctorRepository.GetUserIdByDoctorIdAsync(availability.DoctorId);
                 var doctorId = doctorUserId ?? availability.DoctorId.ToString();
@@ -148,7 +168,14 @@ namespace Clinic_System.Infrastructure.Services
 
         public async Task DeleteAppointmentAsync(int id)
         {
-            await _appointmentRepository.DeleteAsync(id);
+            var appointment = await _appointmentRepository.GetByIdAsync(id);
+            if (appointment == null)
+                throw new ArgumentException("Appointment not found.");
+
+            // Soft delete appointment
+            appointment.IsDeleted = true;
+            appointment.DeletedAt = DateTime.UtcNow;
+            await _appointmentRepository.UpdateAsync(appointment);
         }
         public async Task<(List<AppointmentDTO> Appointments, int totalCount)>
             GetAppointmentsByDoctorIdAsync(string? status, Guid doctorId, int pageNumber, int pageSize, DateTime? startDate, DateTime? endDate)

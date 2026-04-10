@@ -17,10 +17,14 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAllAppointmentsAsync(string? status, int pageNumber , int pageSize)
         {
-            var query =  _db.Appointments
+            var query = _db.Appointments
+                .IgnoreQueryFilters()
                 .Include(a => a.Visit)
+                .Include(a => a.Patient)
+                    .ThenInclude(p => p.User)
                 .Include(a => a.Availability)
-                .ThenInclude(av => av.Doctor).AsQueryable();
+                    .ThenInclude(av => av.Doctor)
+                        .ThenInclude(d => d.User).AsQueryable();
 
             if (!string.IsNullOrEmpty(status))
             {
@@ -80,6 +84,7 @@ namespace Clinic_System.Infrastructure.Repositories
             GetAppointmentsByDoctorIdAsync(string? status, Guid doctorId, int pageNumber, int pageSize, DateTime? startDate, DateTime? endDate)
         {
             var query = _db.Appointments
+                .IgnoreQueryFilters()   
                 .Include(a => a.Patient)
                 .Include(a => a.Visit)
                 .Include(a => a.Availability)
@@ -123,6 +128,7 @@ namespace Clinic_System.Infrastructure.Repositories
         public async Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAppointmentsByPatientIdAsync(string? status, Guid patientId, int pageNumber, int pageSize)
         {
             var query = _db.Appointments
+                .IgnoreQueryFilters()
                .Include(a => a.Patient)
                .Include(a => a.Visit)
                .Include(a => a.Availability)

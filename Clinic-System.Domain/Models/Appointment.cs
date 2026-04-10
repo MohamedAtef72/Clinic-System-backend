@@ -24,6 +24,10 @@ namespace Clinic_System.Domain.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // Soft Delete for Historical Medical Records
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
         // Navigation
         public Patient Patient { get; set; }
         public Visit Visit { get; set; }

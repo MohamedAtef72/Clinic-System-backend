@@ -36,7 +36,11 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task<DoctorAvailability?> GetByIdAsync(int id)
         {
-            return await _db.DoctorAvailabilities.FindAsync(id);
+            return await _db.DoctorAvailabilities
+                        .IgnoreQueryFilters()
+                        .Include(a => a.Doctor)
+                        .ThenInclude(d => d.User)
+                        .FirstOrDefaultAsync(a => a.Id == id);
         }
 
         public async Task UpdateAsync(DoctorAvailability availability)
@@ -58,6 +62,19 @@ namespace Clinic_System.Infrastructure.Repositories
                 await _db.SaveChangesAsync();
             }
 
+        }
+
+        public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
+        {
+            return await _db.DoctorAvailabilities
+                .Where(a => a.DoctorId == doctorId &&
+                            !_db.Appointments.Any(ap => ap.AvailabilityId == a.Id))
+                .ToListAsync();
+        }
+
+        public void RemoveRange(List<DoctorAvailability> availabilities)
+        {
+            _db.DoctorAvailabilities.RemoveRange(availabilities);
         }
     }
 }
