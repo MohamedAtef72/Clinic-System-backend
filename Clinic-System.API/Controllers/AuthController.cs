@@ -1,22 +1,23 @@
-﻿using Clinic_System.Application.DTO;
+﻿using AutoMapper.Internal;
+using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
+using Clinic_System.Domain.Constant;
 using Clinic_System.Domain.Models;
+using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Newtonsoft.Json.Linq;
+using Sprache;
+using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.ComponentModel.DataAnnotations;
-using Clinic_System.Infrastructure.Data;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity.Data;
-using Newtonsoft.Json.Linq;
-using Sprache;
-using Clinic_System.Domain.Constant;
 
 namespace Clinic_System.API.Controllers
 {
@@ -64,7 +65,7 @@ namespace Clinic_System.API.Controllers
 
         [HttpPost("DoctorRegister")]
         [Authorize(Roles = Role.Admin)]
-        public async Task<IActionResult> DoctorRegister([FromForm][Required] DoctorRegisterDTO doctorRegister)
+        public async Task<IActionResult> DoctorRegister([FromForm] DoctorRegisterDTO doctorRegister)
         {
             try
             {
@@ -74,11 +75,11 @@ namespace Clinic_System.API.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(new { Message = "Invalid data", Errors = ModelState });
 
-                // Additional business validation
                 if (doctorRegister.SpecialityId <= 0)
                     return BadRequest(new { Message = "Valid speciality is required" });
 
-                var (error, user) = await _registerService.RegisterUserAsync(doctorRegister, doctorRegister.Image, "Doctor");
+                var (error, user) = await _registerService.RegisterUserAsync(
+                    doctorRegister, doctorRegister.Image, "Doctor");
 
                 if (error != null)
                 {
@@ -86,26 +87,23 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Registration failed", Error = error });
                 }
 
-                var doctor = new Doctor
-                {
-                    UserId = user.Id,
-                    SpecialityId = doctorRegister.SpecialityId
-                };
+                // Use this method (handles create OR restore)
+                var doctor = await _doctorService.EnsureDoctorExistsOrRestoreAsync(
+                    user.Id, doctorRegister.SpecialityId);
 
-                await _doctorService.AddDoctor(doctor);
-
+                // Send Email (only if new or restored)
                 var body = $@"
-                        <!DOCTYPE html>
-                        <html>
-                          <body>
-                            <h2>Welcome to Clinic-System 👩‍⚕️</h2>
-                            <p>Dear Doctor,</p>
-                            <p>Your account has been successfully created.</p>
-                            <p><b>Email:</b> {doctorRegister.Email}</p>
-                            <p><b>Password:</b> {doctorRegister.Password}</p>
-                            <p>Please change your password after first login.</p>
-                          </body>
-                        </html>";
+                                <!DOCTYPE html>
+                                <html>
+                                  <body>
+                                    <h2>Welcome to Clinic-System 👩‍⚕️</h2>
+                                    <p>Dear Doctor,</p>
+                                    <p>Your account has been successfully created.</p>
+                                    <p><b>Email:</b> {doctorRegister.Email}</p>
+                                    <p><b>Password:</b> {doctorRegister.Password}</p>
+                                    <p>Please change your password after first login.</p>
+                                  </body>
+                                </html>";
 
                 var mailRequest = new MailRequestDTO
                 {
@@ -120,29 +118,25 @@ namespace Clinic_System.API.Controllers
                     mailRequest.Subject,
                     mailRequest.Body,
                     mailRequest.Attachments
+
                 );
 
+                _logger.LogInformation("Doctor registered/restored successfully with ID: {UserId}", user.Id);
 
-                _logger.LogInformation("Doctor registered successfully with ID: {UserId}", user.Id);
-                return CreatedAtAction(nameof(DoctorRegister), new { Message = "Doctor registered successfully", UserId = user.Id });
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogError(ex, "Invalid argument during doctor registration");
-                return BadRequest(new { Message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Operation error during doctor registration");
-                return Conflict(new { Message = ex.Message });
+                return Ok(new
+                {
+                    Message = "Doctor registered/restored successfully",
+                    UserId = user.Id
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during doctor registration");
-                return StatusCode(500, new { Message = "An error occurred during registration" });
+                _logger.LogError(ex, "Doctor registration error");
+                return StatusCode(500, new { Message = ex.Message,
+                    StackTrace = ex.StackTrace
+                });
             }
         }
-
         [HttpPost("PatientRegister")]
         public async Task<IActionResult> PatientRegister([FromForm][Required] PatientRegisterDTO patientRegister)
         {
@@ -162,14 +156,8 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Registration failed", Error = error });
                 }
 
-                var patient = new Patient
-                {
-                    UserId = user.Id,
-                    BloodType = patientRegister.BloodType,
-                    MedicalHistory = patientRegister.MedicalHistory
-                };
-
-                await _patientRepository.AddPatient(patient);
+                var patient = await _patientService.EnsurePatientExistsOrRestoreAsync(
+                    user.Id, patientRegister.BloodType, patientRegister.MedicalHistory);
 
                 _logger.LogInformation("Patient registered successfully with ID: {UserId}", user.Id);
                 return CreatedAtAction(nameof(PatientRegister), new { Message = "Patient registered successfully", UserId = user.Id });

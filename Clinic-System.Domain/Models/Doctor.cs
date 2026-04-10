@@ -28,7 +28,5 @@ namespace Clinic_System.Domain.Models
         public Speciality Speciality { get; set; }
         public ICollection<Appointment> Appointments { get; set; }
         public ICollection<DoctorAvailability> Availabilities { get; set; }
-
-
     }
 }

@@ -17,6 +17,10 @@ namespace Clinic_System.Domain.Models
         public ICollection<RefreshToken>? RefreshTokens { get; set; } = new List<RefreshToken>();
         public DateTime? RefreshTokenExpiryTime { get; set; }
 
+        // Soft Delete Support
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
+
         // Navigation Properties
         public Patient Patient { get; set; }
         public Doctor Doctor { get; set; }

@@ -22,7 +22,7 @@ namespace Clinic_System.Infrastructure.Services
             _db = db;
             _userManager = userManager;
         }
-        // Delete User From Specific Table And From ASP.NET USERS
+        // Soft Delete User (deactivate without removing from DB)
         public async Task<IdentityResult> DeleteUserWithRelatedDataAsync(string userId)
         {
             using var transaction = await _db.Database.BeginTransactionAsync();
@@ -32,21 +32,23 @@ namespace Clinic_System.Infrastructure.Services
                 if (user == null)
                     return IdentityResult.Failed(new IdentityError { Description = "User not found" });
 
-                var doctor = await _db.Doctors.FirstOrDefaultAsync(e => e.UserId == userId);
-                if (doctor != null)
-                    _db.Doctors.Remove(doctor);
+                var utcNow = DateTime.UtcNow;
 
-                var patient = await _db.Patients.FirstOrDefaultAsync(e => e.UserId == userId);
-                if (patient != null)
-                    _db.Patients.Remove(patient);
-
-                var receptionist = await _db.Receptionists.FirstOrDefaultAsync(e => e.UserId == userId);
-                if (receptionist != null)
-                    _db.Receptionists.Remove(receptionist);
-
-                var result = await _userManager.DeleteAsync(user);
+                // Soft delete the user (deactivate)
+                user.IsDeleted = true;
+                user.DeletedAt = utcNow;
+                var result = await _userManager.UpdateAsync(user);
                 if (!result.Succeeded)
                     return result;
+
+                // Revoke all refresh tokens
+                var refreshTokens = await _db.RefreshTokens
+                    .Where(rt => rt.UserId == userId)
+                    .ToListAsync();
+                if (refreshTokens.Any())
+                {
+                    _db.RefreshTokens.RemoveRange(refreshTokens);
+                }
 
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -63,6 +65,7 @@ namespace Clinic_System.Infrastructure.Services
         public async Task<(List<UserWithDetails> Users, int TotalCount)> GetAllUsersWithDetailsAsync(int pageNumber, int pageSize)
         {
             var query = from user in _db.Users
+                        where !user.IsDeleted // FILTER: Exclude soft-deleted users
                         join userRole in _db.UserRoles on user.Id equals userRole.UserId into ur
                         from userRole in ur.DefaultIfEmpty()
                         join role in _db.Roles on userRole.RoleId equals role.Id into r
@@ -85,11 +88,12 @@ namespace Clinic_System.Infrastructure.Services
                     UserName = u.User.UserName,
                     Email = u.User.Email,
                     Role = u.RoleName,
-                    SpecialityId = u.User.Doctor.SpecialityId,
-                    BloodType = u.User.Patient.BloodType,
-                    MedicalHistory = u.User.Patient.MedicalHistory,
-                    ShiftStart = u.User.Receptionist.ShiftStart,
-                    ShiftEnd = u.User.Receptionist.ShiftEnd
+                    // Safely handle null Doctor/Patient for deleted users
+                    SpecialityId = u.User.Doctor != null ? u.User.Doctor.SpecialityId : 0,
+                    BloodType = u.User.Patient != null ? u.User.Patient.BloodType : string.Empty,
+                    MedicalHistory = u.User.Patient != null ? u.User.Patient.MedicalHistory : string.Empty,
+                    ShiftStart = u.User.Receptionist != null ? u.User.Receptionist.ShiftStart : null,
+                    ShiftEnd = u.User.Receptionist != null ? u.User.Receptionist.ShiftEnd : null
                 })
                 .ToListAsync();
 

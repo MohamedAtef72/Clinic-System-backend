@@ -6,6 +6,6 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface IRegisterService
     {
-        public Task<(string? Error, ApplicationUser? User)> RegisterUserAsync(UserRegisterBase dto, IFormFile image, string role);
+        public Task<(string? Error, ApplicationUser? existingUser)> RegisterUserAsync(UserRegisterBase dto, IFormFile image, string role);
     }
 }

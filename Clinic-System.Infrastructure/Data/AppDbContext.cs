@@ -29,11 +29,24 @@ namespace Clinic_System.Infrastructure.Data
         {
             base.OnModelCreating(builder);
 
+            // Global Query Filters for Soft Delete
+            // ApplicationUser soft delete
+            builder.Entity<ApplicationUser>()
+                .HasQueryFilter(u => !u.IsDeleted);
+
+            // Appointment soft delete
+            builder.Entity<Appointment>();
+                //.HasQueryFilter(a => !a.IsDeleted);
+
+            // Doctor availability must filter by IsActive and Doctor.User.IsDeleted
+            builder.Entity<DoctorAvailability>()
+                .HasQueryFilter(a => a.IsActive && !a.Doctor.User.IsDeleted);
+
             builder.Entity<Speciality>()
                 .HasIndex(s => s.Name)
                 .IsUnique();
 
-            // Relationships
+            // Relationships - All use Restrict to prevent cascade deletes
 
             builder.Entity<Patient>()
                 .HasOne(p => p.User)
@@ -50,7 +63,8 @@ namespace Clinic_System.Infrastructure.Data
             builder.Entity<Doctor>()
                 .HasOne(d => d.Speciality)
                 .WithMany(s => s.Doctors)
-                .HasForeignKey(d => d.SpecialityId);
+                .HasForeignKey(d => d.SpecialityId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<Receptionist>()
                 .HasOne(r => r.User)
@@ -64,6 +78,12 @@ namespace Clinic_System.Infrastructure.Data
                 .HasForeignKey(a => a.PatientId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            builder.Entity<Appointment>()
+                .HasOne(a => a.Availability)
+                .WithMany()
+                .HasForeignKey(a => a.AvailabilityId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.Entity<DoctorAvailability>()
                 .HasOne(da => da.Doctor)
                 .WithMany(d => d.Availabilities)
@@ -73,7 +93,8 @@ namespace Clinic_System.Infrastructure.Data
             builder.Entity<Visit>()
                 .HasOne(v => v.Appointment)
                 .WithOne(a => a.Visit)
-                .HasForeignKey<Visit>(v => v.AppointmentId);
+                .HasForeignKey<Visit>(v => v.AppointmentId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<Clinic_System.Domain.Models.Notification>(b =>
             {

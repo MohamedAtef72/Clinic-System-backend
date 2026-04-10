@@ -116,5 +116,15 @@ namespace Clinic_System.Application.Services
         {
             await _availabilityRepository.DeleteAsync(id);
         }
+
+        public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
+        {
+            return await _availabilityRepository.GetUnbookedByDoctorIdAsync(doctorId);
+        }
+
+        public void RemoveRange(List<DoctorAvailability> availabilities)
+        {
+            _availabilityRepository.RemoveRange(availabilities);
+        }
     }
 }

@@ -26,30 +26,41 @@ namespace Clinic_System.API.Controllers
         {
             try
             {
-                // Try cache first
-                var version = await _cache.GetVersionAsync("doctors:list");
-                var sanitizedSearch = string.IsNullOrEmpty(searchName) ? "" : searchName;
-                var cacheKey = $"doctors:list:{version}:{sanitizedSearch}:{pageNumber}:{pageSize}";
-                var cached = await _cache.GetAsync<Clinic_System.Application.DTO.DoctorsListDto>(cacheKey);
-
+                var isAdmin = User.IsInRole("Admin");
                 List<DoctorInfoDTO> doctors;
                 int totalCount;
 
-                if (cached != null)
+                if (isAdmin)
                 {
-                    doctors = cached.Doctors;
-                    totalCount = cached.TotalCount;
+                    // Admin: show all doctors (deleted and not deleted), bypass cache for correctness
+                    var (dList, tCount) = await _doctorService.GetAllDoctorsWithDeletedAsync(searchName, pageNumber, pageSize);
+                    doctors = dList;
+                    totalCount = tCount;
                 }
                 else
                 {
-                    var (dList, tCount) = await _doctorService.GetAllDoctorsAsync(searchName, pageNumber, pageSize);
-                    doctors = dList;
-                    totalCount = tCount;
+                    // Try cache for non-admins
+                    var version = await _cache.GetVersionAsync("doctors:list");
+                    var sanitizedSearch = string.IsNullOrEmpty(searchName) ? "" : searchName;
+                    var cacheKey = $"doctors:list:{version}:{sanitizedSearch}:{pageNumber}:{pageSize}";
+                    var cached = await _cache.GetAsync<Clinic_System.Application.DTO.DoctorsListDto>(cacheKey);
 
-                    if (doctors != null && doctors.Any())
+                    if (cached != null)
                     {
-                        var dto = new Clinic_System.Application.DTO.DoctorsListDto { Doctors = doctors, TotalCount = totalCount };
-                        await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(5));
+                        doctors = cached.Doctors;
+                        totalCount = cached.TotalCount;
+                    }
+                    else
+                    {
+                        var (dList, tCount) = await _doctorService.GetAllDoctorsAsync(searchName, pageNumber, pageSize);
+                        doctors = dList;
+                        totalCount = tCount;
+
+                        if (doctors != null && doctors.Any())
+                        {
+                            var dto = new Clinic_System.Application.DTO.DoctorsListDto { Doctors = doctors, TotalCount = totalCount };
+                            await _cache.SetAsync(cacheKey, dto, TimeSpan.FromMinutes(5));
+                        }
                     }
                 }
 
@@ -78,15 +89,19 @@ namespace Clinic_System.API.Controllers
             var cacheKey = $"doctor:{id}:{version}";
             var cached = await _cache.GetAsync<DoctorInfoDTO>(cacheKey);
 
-            DoctorInfoDTO doctor;
-            if (cached != null)
+            DoctorInfoDTO doctor = null;
+
+            if (cached != null && cached.Availabilities?.Count > 0)
             {
                 doctor = cached;
             }
             else
             {
                 doctor = await _doctorService.GetDoctorByIdAsync(id);
-                if (doctor == null) return NotFound(new { Message = "Doctor not found" });
+
+                if (doctor == null)
+                    return NotFound(new { Message = "Doctor not found" });
+
                 await _cache.SetAsync(cacheKey, doctor, TimeSpan.FromMinutes(10));
             }
 

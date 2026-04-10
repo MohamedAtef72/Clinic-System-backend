@@ -3,6 +3,7 @@ using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Clinic_System.Infrastructure.Services
 {
@@ -17,17 +18,61 @@ namespace Clinic_System.Infrastructure.Services
             _photoService = photoService;
         }
 
-        public async Task<(string? Error, ApplicationUser? User)> RegisterUserAsync(UserRegisterBase dto, IFormFile image, string role)
+        public async Task<(string? Error, ApplicationUser? existingUser)> RegisterUserAsync(UserRegisterBase dto, IFormFile image, string role)
         {
-            if (await _userManager.FindByEmailAsync(dto.Email) != null)
-                return ("Email already exists", null);
+            var email = dto.Email;
+            var existingUser = await _userManager.Users
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.Email == email);
+
+            if (existingUser != null)
+            {
+                if (existingUser.IsDeleted)
+                {
+                    // Reactivate user
+                    existingUser.IsDeleted = false;
+                    existingUser.DeletedAt = null;
+
+                    if (dto.Password != dto.ConfirmPassword)
+                        return ("Passwords do not match", null);
+
+                    var url = await _photoService.UploadImageAsync(image);
+
+                    existingUser.UserName = dto.UserName;
+                    existingUser.Email = dto.Email;
+                    existingUser.PhoneNumber = dto.PhoneNumber;
+                    existingUser.Country = dto.Country;
+                    existingUser.Gender = dto.Gender;
+                    existingUser.DateOfBirth = dto.DateOfBirth;
+                    existingUser.RegisterDate = dto.RegisterDate;
+                    existingUser.ImagePath = url;
+
+                    // Reset password
+                    var token = await _userManager.GeneratePasswordResetTokenAsync(existingUser);
+                    var resetResult = await _userManager.ResetPasswordAsync(existingUser, token, dto.Password);
+                    if (!resetResult.Succeeded)
+                        return ("Password is not strong", null);
+
+                    await _userManager.UpdateAsync(existingUser);
+
+                    // Ensure user is in the correct role
+                    var roles = await _userManager.GetRolesAsync(existingUser);
+                    if (!roles.Contains(role))
+                        await _userManager.AddToRoleAsync(existingUser, role);
+
+                    return (null, existingUser);
+                }
+                else
+                {
+                    // Email already in use by active user
+                    return ("Email already in use", null);
+                }
+            }
 
             if (dto.Password != dto.ConfirmPassword)
                 return ("Passwords do not match", null);
 
-            var url = await _photoService.UploadImageAsync(image);
-            //if (url == null)
-            //    return ("Image upload failed", null);
+            var urlNew = await _photoService.UploadImageAsync(image);
 
             var user = new ApplicationUser
             {
@@ -38,7 +83,7 @@ namespace Clinic_System.Infrastructure.Services
                 Gender = dto.Gender,
                 DateOfBirth = dto.DateOfBirth,
                 RegisterDate = dto.RegisterDate,
-                ImagePath = url
+                ImagePath = urlNew
             };
 
             var result = await _userManager.CreateAsync(user, dto.Password);

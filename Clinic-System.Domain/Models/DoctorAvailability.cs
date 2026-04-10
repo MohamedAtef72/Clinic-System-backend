@@ -24,5 +24,8 @@ namespace Clinic_System.Domain.Models
         public Guid? SeriesId { get; set; } 
 
         public bool IsBooked { get; set; }
+
+        // Active flag (not soft delete) - prevents booking without removing historical records
+        public bool IsActive { get; set; } = true;
     }
 }

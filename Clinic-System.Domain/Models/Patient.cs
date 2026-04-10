@@ -18,7 +18,6 @@ namespace Clinic_System.Domain.Models
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-
         // Navigation
         public ApplicationUser User { get; set; }
         public ICollection<Appointment> Appointments { get; set; }
