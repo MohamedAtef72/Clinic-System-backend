@@ -51,7 +51,10 @@ namespace Clinic_System.Infrastructure.Services
                     var token = await _userManager.GeneratePasswordResetTokenAsync(existingUser);
                     var resetResult = await _userManager.ResetPasswordAsync(existingUser, token, dto.Password);
                     if (!resetResult.Succeeded)
-                        return ("Password is not strong", null);
+                    {
+                        var errors = string.Join(", ", resetResult.Errors.Select(e => e.Description));
+                        return (errors, null);
+                    }
 
                     await _userManager.UpdateAsync(existingUser);
 

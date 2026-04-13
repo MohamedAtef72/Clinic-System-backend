@@ -24,7 +24,6 @@ namespace Clinic_System.API.Controllers
                 return Unauthorized();
 
             var pageNumberStr = HttpContext.Request.Query["pageNumber"].FirstOrDefault();
-            var pageSizeStr = HttpContext.Request.Query["pageSize"].FirstOrDefault();
 
             int pageNumber = 1;
             int pageSize = 6;
@@ -32,12 +31,9 @@ namespace Clinic_System.API.Controllers
             if (!string.IsNullOrEmpty(pageNumberStr) && int.TryParse(pageNumberStr, out var p))
                 pageNumber = Math.Max(1, p);
 
-            if (!string.IsNullOrEmpty(pageSizeStr) && int.TryParse(pageSizeStr, out var s))
-                pageSize = Math.Max(1, s);
+            var (notifications , totalCount) = await _notificationService.GetUserNotificationsAsync(userId, pageNumber, pageSize); 
 
-            var notifications = await _notificationService.GetUserNotificationsAsync(userId, pageNumber, pageSize);
-
-            return Ok(new { Message = "Notifications retrieved successfully", PageNumber = pageNumber, PageSize = pageSize, Data = notifications });
+            return Ok(new { Message = "Notifications retrieved successfully", PageNumber = pageNumber, PageSize = pageSize, TotalCount = totalCount, Data = notifications });
         }
 
         [HttpPost("MarkAllAsRead")]

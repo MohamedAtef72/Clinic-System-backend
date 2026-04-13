@@ -26,7 +26,7 @@ namespace Clinic_System.Infrastructure.Repositories
             await _db.SaveChangesAsync();
         }
 
-        public async Task<List<NotificationDto>> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize)
+        public async Task<(List<NotificationDto> Notifications,int TotalCount)> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize)
         {
             // LEFT JOIN Notifications with UserNotifications to include global and personal notifications
             var query = from n in _db.Notifications
@@ -36,6 +36,8 @@ namespace Clinic_System.Infrastructure.Repositories
                         where n.IsGlobal || sub != null
                         orderby n.CreatedAt descending
                         select new { Notification = n, UserNotification = sub };
+
+            var totalCount = await query.CountAsync();
 
             var paged = await query
                 .Skip((pageNumber - 1) * pageSize)
@@ -51,7 +53,7 @@ namespace Clinic_System.Infrastructure.Repositories
                 CreatedAt = x.Notification.CreatedAt
             }).ToList();
 
-            return result;
+            return (result, totalCount);
         }
 
 
