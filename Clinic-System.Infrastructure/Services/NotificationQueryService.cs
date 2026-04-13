@@ -14,9 +14,10 @@ namespace Clinic_System.Infrastructure.Services
             _repo = repo;
         }
 
-        public async Task<List<NotificationDto>> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize)
+        public async Task<(List<NotificationDto> Notifications, int TotalCount)> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize)
         {
-            return await _repo.GetUserNotificationsAsync(userId, pageNumber, pageSize);
+            var (Notifications , TotalCount) = await _repo.GetUserNotificationsAsync(userId, pageNumber, pageSize);
+            return (Notifications , TotalCount);
         }
 
         public async Task MarkAllAsReadAsync(string userId)

@@ -5,7 +5,7 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface INotificationQueryService
     {
-        Task<List<NotificationDto>> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize);
+        Task<(List<NotificationDto> Notifications, int TotalCount)> GetUserNotificationsAsync(string userId, int pageNumber, int pageSize);
         Task MarkAllAsReadAsync(string userId);
         Task MarkNotificationAsReadAsync(string userId, int notificationId);
         Task CreateNotificationForUserAsync(string userId, Clinic_System.Domain.Models.Notification notification);
