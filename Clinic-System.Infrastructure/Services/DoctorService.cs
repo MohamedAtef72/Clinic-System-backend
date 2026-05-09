@@ -3,43 +3,43 @@ using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace Clinic_System.Infrastructure.Services
 {
     public class DoctorService : IDoctorService
     {
-        private readonly DoctorRepository _doctorRepo;
-        private readonly DoctorAvailabilityRepository _availabilityRepo;
+        private readonly IDoctorRepository _doctorRepo;
+        private readonly IDoctorAvailabilityService _availabilityService;
         private readonly INotificationService _notificationService;
         private readonly INotificationQueryService _notificationQueryService;
-        private readonly Clinic_System.Application.Interfaces.ICacheService _cache;
+        private readonly ICacheService _cache;
+        private readonly ILogger<DoctorService> _logger;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public DoctorService(DoctorRepository doctorRepo, DoctorAvailabilityRepository availabilityRepo, INotificationService notificationService, INotificationQueryService notificationQueryService, Clinic_System.Application.Interfaces.ICacheService cache)
+        public DoctorService(UserManager<ApplicationUser> userManager, IDoctorRepository doctorRepo, IDoctorAvailabilityService availabilityService, INotificationService notificationService, INotificationQueryService notificationQueryService, ICacheService cache, ILogger<DoctorService> logger)
         {
             _doctorRepo = doctorRepo;
-            _availabilityRepo = availabilityRepo;
+            _availabilityService = availabilityService;
             _notificationService = notificationService;
             _notificationQueryService = notificationQueryService;
             _cache = cache;
+            _logger = logger;
+            _userManager = userManager;
         }
 
         public async Task<Doctor> EnsureDoctorExistsOrRestoreAsync(string userId, int specialityId)
         {
-            var doctor = await _doctorRepo.GetByUserIdAsync(userId, includeDeleted: true);
+            var doctor = await _doctorRepo.GetByUserIdAsync(
+                userId,
+                includeDeleted: true);
 
             if (doctor != null)
             {
-                // Business logic
                 doctor.SpecialityId = specialityId;
 
-                // Clean availability via repo
-                var unbookedAvailabilities =
-                    await _availabilityRepo.GetUnbookedByDoctorIdAsync(doctor.Id);
-
-                if (unbookedAvailabilities.Any())
-                {
-                    _availabilityRepo.RemoveRange(unbookedAvailabilities);
-                }
+                await _availabilityService.DeleteUnbookedByDoctorIdAsync(doctor.Id);
 
                 await _doctorRepo.SaveChanges();
 
@@ -58,30 +58,45 @@ namespace Clinic_System.Infrastructure.Services
                 SpecialityId = specialityId
             };
 
+            // Track: Add Doctor to Repository
             await _doctorRepo.AddDoctorAsync(newDoctor);
+
+            // Track: Get Doctor Details
+            var userName = await _userManager.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.UserName)
+                .FirstOrDefaultAsync();
 
             //  Notifications (only for NEW doctor)
             var notification = new Notification
             {
                 Title = "New Doctor Added",
-                Message = $"A new doctor was added (UserId: {userId})",
+                Message = $"A new doctor was added (UserName: {userName})",
                 IsGlobal = false,
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _notificationQueryService.CreateGlobalNotificationAsync(notification);
-            await _cache.BumpVersionAsync("doctors:list");
-            await _notificationService.SendNotificationToAll(
-                notification.Title,
-                notification.Message,
-                "DoctorAdded");
+            var notificationTask =
+                _notificationQueryService.CreateGlobalNotificationAsync(notification);
+
+            var cacheTask =
+                _cache.BumpVersionAsync("doctors:list");
+
+            var signalRTask =
+                _notificationService.SendNotificationToAll(
+                    notification.Title,
+                    notification.Message,
+                    "DoctorAdded");
+
+            // choose max time for all methods and wait it
+            await Task.WhenAll(notificationTask, cacheTask, signalRTask);
 
             return newDoctor;
         }
 
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, string? gender, int? speciality, int pageNumber, int pageSize)
         {
-            return await _doctorRepo.GetAllDoctorsAsync(searchName,pageNumber, pageSize);
+            return await _doctorRepo.GetAllDoctorsAsync(searchName, gender, speciality, pageNumber, pageSize);
         }
 
         public async Task<DoctorInfoDTO> GetDoctorByIdAsync(Guid id)
@@ -92,19 +107,14 @@ namespace Clinic_System.Infrastructure.Services
         {
             return await _doctorRepo.GetDoctorByUserIdAsync(userId);
         }
-
-        public async Task<IdentityResult> UpdateDoctorAsync(string userId, UserEditProfile doctorEdit)
-        {
-            return await _doctorRepo.UpdateDoctorAsync(userId, doctorEdit);
-        }
         public async Task<bool> UpdateDoctorPriceAsync(Guid doctorId, int price)
         {
             return await _doctorRepo.UpdateDoctorPriceAsync(doctorId, price);
         }
 
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsWithDeletedAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsWithDeletedAsync(string? searchName, string? gender, int? speciality, int pageNumber, int pageSize)
         {
-            return await _doctorRepo.GetAllDoctorsWithDeletedAsync(searchName, pageNumber, pageSize);
+            return await _doctorRepo.GetAllDoctorsWithDeletedAsync(searchName, gender, speciality, pageNumber, pageSize);
         }
     }
 }

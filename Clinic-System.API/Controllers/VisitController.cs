@@ -2,6 +2,7 @@
 using Clinic_System.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 
@@ -20,6 +21,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("GetAll")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAll()
         {
             try
@@ -34,6 +36,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("{id}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetById([Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id)
         {
             try
@@ -54,6 +57,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("doctor/{doctorId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetByDoctorId([Required] Guid doctorId)
         {
             try
@@ -74,6 +78,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("patient/{patientId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetByPatientId([Required] Guid patientId)
         {
             try

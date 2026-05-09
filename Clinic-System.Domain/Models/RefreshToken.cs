@@ -14,6 +14,7 @@ namespace Clinic_System.Domain.Models
         public DateTime ExpiryDate { get; set; }
         public DateTime CreatedDate { get; set; }
         public string CreatedByIp { get; set; } = string.Empty;
+        public bool IsRevoked { get; set; }
 
         public ApplicationUser User { get; set; } = null!;
     }

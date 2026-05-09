@@ -1,11 +1,12 @@
 using Clinic_System.Application.DTO;
+using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class NotificationRepository
+    public class NotificationRepository : INotificationRepository
     {
         private readonly AppDbContext _db;
 

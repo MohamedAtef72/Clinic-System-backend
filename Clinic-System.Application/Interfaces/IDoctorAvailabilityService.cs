@@ -12,7 +12,8 @@ namespace Clinic_System.Application.Interfaces
         Task<DoctorAvailabilityDTO?> GetAvailabilityByIdAsync(int id);
         Task UpdateAvailabilityAsync(int id, DateTime startTime, DateTime endTime);
         Task DeleteAvailabilityAsync(int id);
-        Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId);
-        void RemoveRange(List<DoctorAvailability> availabilities);
+        //Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId);
+        //void RemoveRange(List<DoctorAvailability> availabilities);
+        Task DeleteUnbookedByDoctorIdAsync(Guid doctorId);
     }
 }

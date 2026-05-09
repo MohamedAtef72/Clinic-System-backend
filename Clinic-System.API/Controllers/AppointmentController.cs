@@ -5,6 +5,7 @@ using Clinic_System.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -21,6 +22,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("GetAll")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAllAppointments([FromQuery] string? status,[FromQuery]int pageNumber = 1 ,[FromQuery] int pageSize = 5)
         {
             try
@@ -46,6 +48,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("{id}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAppointmentById([Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id)
         {
             try
@@ -67,6 +70,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("Create")]
+        [EnableRateLimiting("WritePolicy")]
         public async Task<IActionResult> CreateAppointment([FromBody][Required] CreateAppointmentDTO dto)
         {
             try
@@ -98,6 +102,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPut("Update/{id}")]
+        [EnableRateLimiting("WritePolicy")]
         public async Task<IActionResult> UpdateAppointmentStatus(
             [Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id,
             [FromBody][Required] UpdateAppointmentDTO dto)
@@ -135,6 +140,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpDelete("{id}")]
+        [EnableRateLimiting("WritePolicy")]
         public async Task<IActionResult> DeleteAppointment([Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id)
         {
             try
@@ -162,6 +168,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("doctor/{doctorId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAppointmentsByDoctorId([FromQuery] string? status, [Required] Guid doctorId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5,
             [FromQuery] DateTime? startDate = null,
             [FromQuery] DateTime? endDate = null)
@@ -196,8 +203,8 @@ namespace Clinic_System.API.Controllers
             }
         }
 
-
         [HttpGet("patient/{patientId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAppointmentsByPatientId([FromQuery] string? status, [Required] Guid patientId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 5)
         {
             try

@@ -1,225 +1,358 @@
 using AspNetCoreRateLimit;
+using Clinic_System.API.Hubs;
+using Clinic_System.API.Middleware;
 using Clinic_System.Application.Interfaces;
+using Clinic_System.Application.Services;
 using Clinic_System.Domain.Constant;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
-using DotNetEnv;
+using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using Clinic_System.Application.Services;
-using Microsoft.Extensions.DependencyInjection;
-using Clinic_System.API.Hubs;
 using StackExchange.Redis;
-
+using System.Text;
+using System.Text.Json;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// env
-Env.Load();
+// Railway Dynamic Port
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"https://*:{port}");
+
+// Add environment variables
 builder.Configuration.AddEnvironmentVariables();
 
-// jwtSetttings from appsettings.json
+// Hangfire
+builder.Services.AddHangfire(config =>
+    config.UseSqlServerStorage(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    )
+);
+
+builder.Services.AddHangfireServer();
+
+// JWT Settings
 var jwtSettings = builder.Configuration.GetSection("JWT");
 
-// Add services to the container.
-builder.Services.AddControllers();
+// Controllers
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy =
+            JsonNamingPolicy.CamelCase;
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+        options.JsonSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter()
+        );
+    });
+
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Identity with Roles
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => {
-    // --- Password settings ---
-    options.Password.RequireDigit = true;           // Requires at least one number (0-9)
-    options.Password.RequiredLength = 8;            // Minimum password length
-    options.Password.RequireNonAlphanumeric = true; // Requires at least one special character (e.g., !, @, #)
-    options.Password.RequireUppercase = true;       // Requires at least one uppercase letter (A-Z)
-    options.Password.RequireLowercase = true;       // Requires at least one lowercase letter (a-z)
+// Identity
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
 
-    // -- Username settings
-    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ ";
+    options.User.AllowedUserNameCharacters =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+ ";
 })
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddDefaultTokenProviders();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
-// Add DataBase Services
+// Database
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+    ));
 
-// Injection
-// Repository
-builder.Services.AddScoped<DoctorRepository>();
-builder.Services.AddScoped<PatientRepository>();
-builder.Services.AddScoped<ReceptionistRepository>();
-builder.Services.AddScoped<UserRepository>();
-builder.Services.AddScoped<SpecialityRepository>();
-builder.Services.AddScoped<DoctorAvailabilityRepository>();
-builder.Services.AddScoped<AppointmentRepository>();
-builder.Services.AddScoped<VisitRepository>();
-builder.Services.AddScoped<RatingRepository>();
-builder.Services.AddScoped<AdminRepository>();
-builder.Services.AddScoped<NotificationRepository>();
-// Interfaces
-builder.Services.AddScoped<IUserService,UserService>();
-builder.Services.AddScoped<IRegisterService,RegisterService>();
+// =======================
+// Dependency Injection
+// =======================
+
+// Repositories
+builder.Services.AddScoped<IDoctorRepository, DoctorRepository>();
+builder.Services.AddScoped<IPatientRepository, PatientRepository>();
+builder.Services.AddScoped<IReceptionistRepository, ReceptionistRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ISpecialityRepository, SpecialityRepository>();
+builder.Services.AddScoped<IDoctorAvailabilityRepository, DoctorAvailabilityRepository>();
+builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+builder.Services.AddScoped<IVisitRepository, VisitRepository>();
+builder.Services.AddScoped<IRatingRepository, RatingRepository>();
+builder.Services.AddScoped<IAdminRepository, AdminRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+
+// Services
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRegisterService, RegisterService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoleSeederService, RoleSeederService>();
 builder.Services.AddScoped<ISpecialityService, SpecialityService>();
-builder.Services.AddScoped<IDoctorService,DoctorService>();
-builder.Services.AddScoped<DoctorService>();
+builder.Services.AddScoped<IDoctorService, DoctorService>();
 builder.Services.AddScoped<IDoctorAvailabilityService, DoctorAvailabilityService>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IReceptionistService, ReceptionistService>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
 builder.Services.AddScoped<IRatingService, RatingService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
-builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>();
-builder.Services.AddScoped<NotificationRepository>();
-// Redis and caching
-var redisConn = builder.Configuration["Redis__Connection"] ?? "redis:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect(redisConn));
-builder.Services.AddScoped<Clinic_System.Application.Interfaces.ICacheService, Clinic_System.Infrastructure.Services.RedisCacheService>();
-// appointment repo and service already registered earlier; ensure correct signatures for DI
 
+// SignalR
+builder.Services.AddSignalR();
+
+// Redis
+var redisConn =
+    Environment.GetEnvironmentVariable("REDIS_URL")
+    ?? builder.Configuration["Redis__Connection"];
+
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    sp => ConnectionMultiplexer.Connect(redisConn)
+);
+
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme =
+        JwtBearerDefaults.AuthenticationScheme;
+
+    options.DefaultChallengeScheme =
+        JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(options =>
 {
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidIssuer = jwtSettings["Issuer"],
+    options.TokenValidationParameters =
+        new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSettings["Issuer"],
 
-        ValidateAudience = true,
-        ValidAudience = jwtSettings["Audience"],
+            ValidateAudience = true,
+            ValidAudience = jwtSettings["Audience"],
 
-        ValidateLifetime = true,
-        IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(jwtSettings["SecretKey"])),
-        ClockSkew = TimeSpan.Zero // remove default 5 min tolerance
-    };
+            ValidateLifetime = true,
 
-    // Read JWT from HttpOnly cookie
+            ValidateIssuerSigningKey = true,
+
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!)
+            ),
+
+            ClockSkew = TimeSpan.Zero
+        };
+
     options.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
         {
-            // Check if JWT is in cookie
             if (context.Request.Cookies.ContainsKey("t"))
             {
                 context.Token = context.Request.Cookies["t"];
             }
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine("JWT Token validated successfully");
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"JWT Authentication failed: {context.Exception.Message}");
+
             return Task.CompletedTask;
         }
     };
 });
 
+// Cloudinary
+builder.Services.Configure<CloudinarySettings>(
+    builder.Configuration.GetSection("CloudinarySettings"));
 
-// Add Cloudinary Services
-builder.Services.Configure<CloudinarySettings>(builder.Configuration.GetSection("CloudinarySettings"));
 builder.Services.AddScoped<IPhotoService, PhotoService>();
 
-// Auto Mapper Services
+// AutoMapper
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.AddProfile<MappingProfile>();
 });
 
-
-// Rate Limiting
+// Memory Cache
 builder.Services.AddMemoryCache();
-builder.Services.Configure<IpRateLimitOptions>(options =>
-{
-    options.GeneralRules = new List<RateLimitRule>
-    {
-        new RateLimitRule
-        {
-            Endpoint = "*",
-            Limit = 100,
-            Period = "1m"
-        }
-    };
-});
+
 builder.Services.AddInMemoryRateLimiting();
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 
-// binb MailSettings Class With MailSettings Key in Appsetting.json
+// Mail Settings
 builder.Services.Configure<MailSettings>(
     builder.Configuration.GetSection("MailSettings"));
 
-// Add IMailingServices 
 builder.Services.AddTransient<IMailingServices, MailingService>();
 
-// Admin Setting
+// Admin Settings
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
-
+// CORS
 var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(allowedOrigin)
+        policy.WithOrigins(allowedOrigin!)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
 
+// Rate Limiter
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    // Auth endpoints
+    options.AddPolicy("AuthPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey:
+                context.Connection.RemoteIpAddress?.ToString()
+                ?? "global",
+
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder =
+                    QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Read endpoints
+    options.AddPolicy("ReadPolicy", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey:
+                context.Connection.RemoteIpAddress?.ToString()
+                ?? "global",
+
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 200,
+                Window = TimeSpan.FromSeconds(10),
+                SegmentsPerWindow = 5,
+                QueueProcessingOrder =
+                    QueueProcessingOrder.OldestFirst,
+                QueueLimit = 20
+            }));
+
+    // Write endpoints
+    options.AddPolicy("WritePolicy", context =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            partitionKey:
+                context.Connection.RemoteIpAddress?.ToString()
+                ?? "global",
+
+            factory: _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 50,
+                TokensPerPeriod = 10,
+                ReplenishmentPeriod =
+                    TimeSpan.FromSeconds(1),
+
+                AutoReplenishment = true,
+
+                QueueLimit = 10,
+
+                QueueProcessingOrder =
+                    QueueProcessingOrder.OldestFirst
+            }));
+
+    // Global limiter
+    options.GlobalLimiter =
+        PartitionedRateLimiter.Create<HttpContext, string>(
+            httpContext =>
+                RateLimitPartition.GetTokenBucketLimiter(
+                    partitionKey:
+                        httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "global",
+
+                    factory: _ => new TokenBucketRateLimiterOptions
+                    {
+                        TokenLimit = 100,
+                        TokensPerPeriod = 20,
+                        ReplenishmentPeriod =
+                            TimeSpan.FromSeconds(1),
+
+                        AutoReplenishment = true,
+
+                        QueueLimit = 50
+                    }));
+});
+
 var app = builder.Build();
 
-// Seeder Services
+// Seeder + Migrations
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var dbContext =
+        scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
     dbContext.Database.Migrate();
 
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var roleManager =
+        scope.ServiceProvider
+            .GetRequiredService<RoleManager<IdentityRole>>();
+
     await RoleSeederService.SeedAsync(roleManager);
 
-    var seeder = scope.ServiceProvider.GetRequiredService<IRoleSeederService>();
+    var seeder =
+        scope.ServiceProvider
+            .GetRequiredService<IRoleSeederService>();
+
     await seeder.SeedRolesAndAdminAsync();
 }
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// Swagger
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// Forwarded Headers (IMPORTANT FOR RAILWAY)
+app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto
+});
 
 app.UseHttpsRedirection();
+
 app.UseStaticFiles();
+
 app.UseCors("AllowReactApp");
-//app.UseIpRateLimiting();
+
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+
 app.UseAuthentication();
+
 app.UseAuthorization();
+
+app.UseRateLimiter();
+
+// Health Check
+app.MapGet("/", () => Results.Ok("Clinic API Running"));
+
 app.MapControllers();
+
 app.MapHub<ClinicHub>("/clinicHub");
+
+// Hangfire Dashboard
+app.UseHangfireDashboard("/hangfire");
 
 app.Run();

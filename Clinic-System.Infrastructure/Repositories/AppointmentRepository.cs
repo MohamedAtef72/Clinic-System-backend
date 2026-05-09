@@ -1,4 +1,5 @@
 ﻿using Clinic_System.Application.DTO;
+using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class AppointmentRepository
+    public class AppointmentRepository : IAppointmentRepository
     {
         private readonly AppDbContext _db;
 

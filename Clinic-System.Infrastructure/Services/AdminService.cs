@@ -11,8 +11,8 @@ namespace Clinic_System.Infrastructure.Services
 {
     public class AdminService : IAdminService
     {
-        private readonly AdminRepository _adminRepo;
-        public AdminService(AdminRepository adminRepository)
+        private readonly IAdminRepository _adminRepo;
+        public AdminService(IAdminRepository adminRepository)
         {
             _adminRepo = adminRepository;
         }

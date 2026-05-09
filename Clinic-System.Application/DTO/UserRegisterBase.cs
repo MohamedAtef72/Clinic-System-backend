@@ -29,7 +29,7 @@ namespace Clinic_System.Application.DTO
         public DateOnly DateOfBirth { get; set; }
         [Required]
         public DateOnly RegisterDate { get; set; } = DateOnly.FromDateTime(DateTime.Now);
-        public IFormFile? Image { get; set; }
+        public string? ImagePath { get; set; }
 
     }
 }

@@ -13,10 +13,12 @@ namespace Clinic_System.Application.Interfaces
     {
         Task<Patient> AddPatient(string userId, string bloodType, string medicalHistory);
         Task<IdentityResult> UpdatePatientAsync(string userId, UserEditProfile PatientEdit);
-        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync( string? searchName, int pageNumber, int pageSize);
+        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync( string? searchName, string? gender, int pageNumber, int pageSize);
         Task<PatientInfoDTO> GetPatientByIdAsync(Guid id);
         Task<PatientInfoDTO> GetPatientByUserIdAsync(string userId);
-        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, int pageNumber, int pageSize);
+        Task<Patient> GetPatientWithID(Guid id);
+
+        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, string? gender, int pageNumber, int pageSize);
         Task<Patient> EnsurePatientExistsOrRestoreAsync(string userId, string bloodType, string medicalHistory);
     }
 }

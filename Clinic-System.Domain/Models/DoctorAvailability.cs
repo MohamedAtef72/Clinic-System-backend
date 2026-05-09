@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Clinic_System.Domain.Enums;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -18,14 +19,12 @@ namespace Clinic_System.Domain.Models
         public DateTime StartTime { get; set; }
         public DateTime EndTime { get; set; }
 
-        // recurrence
-        public string? RecurrencePattern { get; set; }   // "None", "Weekly", "BiWeekly", ...
+        public RecurrencePattern RecurrencePattern { get; set; }   
         public DateTime? RecurrenceEndDate { get; set; }
         public Guid? SeriesId { get; set; } 
 
         public bool IsBooked { get; set; }
 
-        // Active flag (not soft delete) - prevents booking without removing historical records
         public bool IsActive { get; set; } = true;
     }
 }

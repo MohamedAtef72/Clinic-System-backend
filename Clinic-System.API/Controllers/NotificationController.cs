@@ -1,6 +1,7 @@
 using Clinic_System.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -17,6 +18,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("User")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetUserNotifications()
         {
             var userId = User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;

@@ -14,7 +14,7 @@ namespace Clinic_System.Application.DTO
         public int ConsulationPrice { get; set; }
         public string SpecialityName { get; set; }
         public bool IsDeleted { get; set; }
-        public List<DoctorAvailabilityDTO> Availabilities { get; set; }
-        = new List<DoctorAvailabilityDTO>();
+        //public List<DoctorAvailabilityDTO> Availabilities { get; set; }
+        //= new List<DoctorAvailabilityDTO>();
     }
 }

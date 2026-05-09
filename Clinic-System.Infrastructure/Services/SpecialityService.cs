@@ -11,9 +11,9 @@ namespace Clinic_System.Infrastructure.Services
 {
     public class SpecialityService : ISpecialityService
     {
-        private readonly SpecialityRepository _repo;
+        private readonly ISpecialityRepository _repo;
 
-        public SpecialityService(SpecialityRepository repo)
+        public SpecialityService(ISpecialityRepository repo)
         {
             _repo = repo;
         }
