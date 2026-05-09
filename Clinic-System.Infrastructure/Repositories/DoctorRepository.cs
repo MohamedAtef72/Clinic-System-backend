@@ -2,6 +2,7 @@
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
+using CloudinaryDotNet.Core;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,7 +17,6 @@ namespace Clinic_System.Infrastructure.Repositories
             _db = db;
         }
 
-        // Add Doctor
         public async Task AddDoctorAsync(Doctor newDoctor)
         {
             if (newDoctor != null)
@@ -26,20 +26,29 @@ namespace Clinic_System.Infrastructure.Repositories
             }
         }
 
-        // Get All Doctors
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsAsync(string? searchName, string? gender, int? speciality, int pageNumber, int pageSize)
         {
             var query = _db.Doctors
+                .AsNoTracking()
                         .Include(d => d.User)
                         .Include(d => d.Speciality)
-                        .Include(d => d.Availabilities)
-                        .Where(d => !d.User.IsDeleted) // FILTER: Exclude soft-deleted doctors
+                        .Where(d => !d.User.IsDeleted) 
                         .AsQueryable();
 
             if (!String.IsNullOrEmpty(searchName))
             {
                 query = query 
                 .Where(d => d.User.UserName.Contains(searchName));
+            }
+
+            if (!String.IsNullOrEmpty(gender))
+            {
+                query = query.Where(a => a.User.Gender == gender);
+            }
+
+            if (speciality.HasValue)
+            {   
+                query = query.Where(a => a.SpecialityId == speciality);
             }
 
             var totalCount = await query.CountAsync();
@@ -60,35 +69,33 @@ namespace Clinic_System.Infrastructure.Repositories
                     RegisterDate = doctor.User.RegisterDate,
                     SpecialityId = doctor.SpecialityId,
                     SpecialityName = doctor.Speciality.Name,
-                    // Only show active availabilities to API consumers
-                    Availabilities = doctor.Availabilities
-                        .Where(a => a.IsActive)
-                        .Select(a => new DoctorAvailabilityDTO
-                        {
-                            Id = a.Id,
-                            StartTime = a.StartTime,
-                            EndTime = a.EndTime,
-                            IsBooked = a.IsBooked
-                        }).ToList()
                 }).ToListAsync();
 
             return (doctors, totalCount);
         }
 
-        // Get All Doctors (including deleted)
-        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsWithDeletedAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<DoctorInfoDTO> Doctors, int TotalCount)> GetAllDoctorsWithDeletedAsync(string? searchName, string? gender, int? speciality, int pageNumber, int pageSize)
         {
             var query = _db.Doctors
+                .AsNoTracking()
                         .IgnoreQueryFilters()
                         .Include(d => d.User)
                         .Include(d => d.Speciality)
-                        .Include(d => d.Availabilities)
                         .AsQueryable();
 
             if (!String.IsNullOrEmpty(searchName))
             {
                 query = query
                 .Where(d => d.User.UserName.Contains(searchName));
+            }
+            if (!String.IsNullOrEmpty(gender))
+            {
+                query = query.Where(a => a.User.Gender == gender);
+            }
+
+            if (speciality.HasValue)
+            {
+                query = query.Where(a => a.SpecialityId == speciality);
             }
 
             var totalCount = await query.CountAsync();
@@ -110,28 +117,18 @@ namespace Clinic_System.Infrastructure.Repositories
                     SpecialityId = doctor.SpecialityId,
                     SpecialityName = doctor.Speciality.Name,
                     IsDeleted = doctor.User.IsDeleted,
-                    Availabilities = doctor.Availabilities
-                        .Where(a => a.IsActive)
-                        .Select(a => new DoctorAvailabilityDTO
-                        {
-                            Id = a.Id,
-                            StartTime = a.StartTime,
-                            EndTime = a.EndTime,
-                            IsBooked = a.IsBooked
-                        }).ToList()
                 }).ToListAsync();
 
             return (doctors, totalCount);
         }
 
-        // Get Doctor by Id
         public async Task<DoctorInfoDTO?> GetDoctorByIdAsync(Guid id)
         {
             var doctor = await _db.Doctors
+                .AsNoTracking()
                 .IgnoreQueryFilters()
                 .Include(d => d.User)
                 .Include(d => d.Speciality)
-                .Include(d => d.Availabilities)
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (doctor == null) return null;
@@ -150,26 +147,15 @@ namespace Clinic_System.Infrastructure.Repositories
                 RegisterDate = doctor.User.RegisterDate,
                 SpecialityId = doctor.SpecialityId,
                 SpecialityName = doctor.Speciality?.Name,
-                // Only show active availabilities to API consumers
-                Availabilities = doctor.Availabilities
-                    .Where(a => a.IsActive)
-                    .Select(a => new DoctorAvailabilityDTO
-                    {
-                        Id = a.Id,
-                        StartTime = a.StartTime,
-                        EndTime = a.EndTime,
-                        IsBooked = a.IsBooked
-                    }).ToList()
             };
         }
 
-        // Get Doctor By UserId
         public async Task<DoctorInfoDTO?> GetDoctorByUserIdAsync(string userId)
         {
             var doctor = await _db.Doctors
+                .AsNoTracking()
                 .Include(d => d.User)
                 .Include(d => d.Speciality)
-                .Include(d => d.Availabilities)
                 .FirstOrDefaultAsync(e => e.UserId == userId);
 
             if (doctor == null) return null;
@@ -187,37 +173,9 @@ namespace Clinic_System.Infrastructure.Repositories
                 RegisterDate = doctor.User.RegisterDate,
                 SpecialityId = doctor.SpecialityId,
                 SpecialityName = doctor.Speciality?.Name,
-                // Only show active availabilities to API consumers
-                Availabilities = doctor.Availabilities
-                    .Where(a => a.IsActive)
-                    .Select(a => new DoctorAvailabilityDTO
-                    {
-                        Id = a.Id,
-                        StartTime = a.StartTime,
-                        EndTime = a.EndTime,
-                        IsBooked = a.IsBooked
-                    }).ToList()
             };
         }
 
-        // Update Doctor
-        public async Task<IdentityResult> UpdateDoctorAsync(string userId, UserEditProfile doctorEdit)
-        {
-            var doctorFromDB = await _db.Doctors.FirstOrDefaultAsync(e => e.UserId == userId);
-            if (doctorFromDB == null)
-            {
-                return IdentityResult.Failed(new IdentityError { Description = "Doctor not found." });
-            }
-
-            _db.Doctors.Update(doctorFromDB);
-            var changes = await _db.SaveChangesAsync();
-
-            return changes > 0
-                ? IdentityResult.Success
-                : IdentityResult.Failed(new IdentityError { Description = "No changes were made." });
-        }
-
-        // Update Price
         public async Task<bool> UpdateDoctorPriceAsync(Guid doctorId, int price)
         {
             var doctor = await _db.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);
@@ -231,7 +189,6 @@ namespace Clinic_System.Infrastructure.Repositories
             return true;
         }
 
-        // Get the ApplicationUser Id for a given doctor Id
         public async Task<string?> GetUserIdByDoctorIdAsync(Guid doctorId)
         {
             var doctor = await _db.Doctors.FirstOrDefaultAsync(d => d.Id == doctorId);

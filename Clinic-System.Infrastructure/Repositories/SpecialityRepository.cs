@@ -1,10 +1,11 @@
-﻿using Clinic_System.Domain.Models;
+﻿using Clinic_System.Application.Interfaces;
+using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class SpecialityRepository
+    public class SpecialityRepository : ISpecialityRepository
     {
         private readonly AppDbContext _db;
 

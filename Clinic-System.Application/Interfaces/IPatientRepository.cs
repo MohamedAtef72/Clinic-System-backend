@@ -9,8 +9,8 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface IPatientRepository
     {
-        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(string? searchName, int pageNumber, int pageSize);
-        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, int pageNumber, int pageSize);
+        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(string? searchName, string? gender, int pageNumber, int pageSize);
+        Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, string? gender, int pageNumber, int pageSize);
         Task<Patient> GetPatientByIdAsync(Guid id);
         Task<Patient> GetPatientByUserIdAsync(string userId);
         Task AddPatient(Patient newPatient);

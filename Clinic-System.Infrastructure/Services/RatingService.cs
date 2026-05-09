@@ -11,9 +11,9 @@ namespace Clinic_System.Infrastructure.Services
 {
     public class RatingService : IRatingService
     {
-        private readonly RatingRepository _rateRepository;
+        private readonly IRatingRepository _rateRepository;
 
-        public RatingService(RatingRepository rateRepository)
+        public RatingService(IRatingRepository rateRepository)
         {
             _rateRepository = rateRepository;
         }

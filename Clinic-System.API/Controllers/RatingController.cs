@@ -1,6 +1,7 @@
 ﻿using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -16,6 +17,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("{appointmentId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetRatingByAppointmentId(int appointmentId)
         {
             try
@@ -42,6 +44,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("doctor/{doctorId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetRatingsByDoctorId(Guid doctorId)
         {
             try

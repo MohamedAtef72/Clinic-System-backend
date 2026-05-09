@@ -1,4 +1,5 @@
-﻿using Clinic_System.Domain.Models;
+﻿using Clinic_System.Application.Interfaces;
+using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class VisitRepository
+    public class VisitRepository : IVisitRepository
     {
         private readonly AppDbContext _db;
 

@@ -7,6 +7,7 @@ using Clinic_System.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -23,6 +24,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("AllSpecialities")]
+        [EnableRateLimiting("ReadPolicy")]
         [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
@@ -34,6 +36,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("{id}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetById(int id)
         {
             var speciality = await _service.GetByIdAsync(id);

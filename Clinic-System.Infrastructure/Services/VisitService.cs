@@ -11,10 +11,10 @@ namespace Clinic_System.Infrastructure.Services
 {
     public class VisitService : IVisitService
     {
-        private readonly VisitRepository _visitRepository;
+        private readonly IVisitRepository _visitRepository;
         private readonly IMapper _mapper;
 
-        public VisitService(VisitRepository visitRepository, IMapper mapper)
+        public VisitService(IVisitRepository visitRepository, IMapper mapper)
         {
             _visitRepository = visitRepository;
             _mapper = mapper;

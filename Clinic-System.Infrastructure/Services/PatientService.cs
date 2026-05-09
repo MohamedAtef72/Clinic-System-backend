@@ -8,16 +8,16 @@ namespace Clinic_System.Application.Services
 {
     public class PatientService : IPatientService
     {
-        private readonly PatientRepository _patientRepository;
+        private readonly IPatientRepository _patientRepository;
 
-        public PatientService(PatientRepository patientRepository)
+        public PatientService(IPatientRepository patientRepository)
         {
             _patientRepository = patientRepository;
         }
 
-        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync( string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync( string? searchName, string? gender ,int pageNumber, int pageSize)
         {
-            return await _patientRepository.GetAllPatientsAsync( searchName,pageNumber, pageSize);
+            return await _patientRepository.GetAllPatientsAsync( searchName,gender,pageNumber, pageSize);
         }
 
         public async Task<PatientInfoDTO> GetPatientByIdAsync(Guid id)
@@ -60,9 +60,13 @@ namespace Clinic_System.Application.Services
                 MedicalHistory = patient.MedicalHistory,
             };
         }
-        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<Patient>GetPatientWithID(Guid id)
         {
-            return await _patientRepository.GetAllPatientsWithDeletedAsync(searchName, pageNumber, pageSize);
+            return await _patientRepository.GetPatientByIdAsync(id);
+        }
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, string? gender, int pageNumber, int pageSize)
+        {
+            return await _patientRepository.GetAllPatientsWithDeletedAsync(searchName, gender, pageNumber, pageSize);
         }
 
         public async Task<Patient> EnsurePatientExistsOrRestoreAsync(string userId, string bloodType, string medicalHistory)

@@ -2,34 +2,30 @@
 using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
-using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
-using Microsoft.EntityFrameworkCore;
-using Org.BouncyCastle.Crypto;
-using System.Reflection.Metadata.Ecma335;
 
 namespace Clinic_System.Infrastructure.Services
 {
     public class AppointmentService : IAppointmentService
     {
-        private readonly AppointmentRepository _appointmentRepository;
-        private readonly DoctorAvailabilityRepository _doctorAvailabilityRepository;
+        private readonly IAppointmentRepository _appointmentRepository;
+        private readonly IDoctorAvailabilityRepository _doctorAvailabilityRepository;
+        private readonly IPatientService _patientService;
         private readonly IMapper _mapper;
         private readonly INotificationQueryService _notificationQueryService;
         private readonly INotificationService _notificationService;
-        private readonly DoctorRepository _doctorRepository;
-        private readonly AppDbContext _db;
+        private readonly IDoctorRepository _doctorRepository;
 
 
-        public AppointmentService(AppointmentRepository appointmentRepository , IMapper mapper, DoctorAvailabilityRepository doctorAvailabilityRepository, DoctorRepository doctorRepository, INotificationService notificationService, INotificationQueryService notificationQueryService, AppDbContext db)
+        public AppointmentService(IPatientService patientService, IAppointmentRepository appointmentRepository , IMapper mapper, IDoctorAvailabilityRepository doctorAvailabilityRepository, IDoctorRepository doctorRepository, INotificationService notificationService, INotificationQueryService notificationQueryService)
         {
+            _patientService = patientService;
             _appointmentRepository = appointmentRepository;
             _mapper = mapper;
             _doctorAvailabilityRepository = doctorAvailabilityRepository;
             _notificationQueryService = notificationQueryService;
             _notificationService = notificationService;
             _doctorRepository = doctorRepository;
-            _db = db;
         }
 
         public async Task<(List<AppointmentDTO> Appointments, int TotalCount)> GetAllAppointmentsAsync( string? status, int pageNumber, int pageSize)
@@ -72,9 +68,9 @@ namespace Clinic_System.Infrastructure.Services
                 throw new InvalidOperationException("This slot is already booked.");
 
             // Check if Patient is deactivated
-            var patient = await _db.Patients
-                .Include(p => p.User)
-                .FirstOrDefaultAsync(p => p.Id == dto.PatientId);
+
+            var patient = await _patientService.GetPatientWithID(dto.PatientId);
+
             if (patient == null || patient.User.IsDeleted)
                 throw new InvalidOperationException("Patient is no longer active or does not exist.");
 
@@ -165,7 +161,6 @@ namespace Clinic_System.Infrastructure.Services
             await _notificationService.SendNotificationToUser(doctorId, notification2.Title, notification2.Message, "AppointmentStatusChanged");
         }
 
-
         public async Task DeleteAppointmentAsync(int id)
         {
             var appointment = await _appointmentRepository.GetByIdAsync(id);
@@ -182,7 +177,6 @@ namespace Clinic_System.Infrastructure.Services
         {
             return await _appointmentRepository.GetAppointmentsByDoctorIdAsync(status,doctorId, pageNumber, pageSize, startDate, endDate);
         }
-
 
         public async Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAppointmentsByPatientIdAsync(string? status, Guid patientId, int pageNumber, int pageSize)
         {

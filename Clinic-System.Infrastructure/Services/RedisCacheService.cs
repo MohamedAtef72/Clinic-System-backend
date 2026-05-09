@@ -31,7 +31,6 @@ namespace Clinic_System.Infrastructure.Services
                 await _db.StringSetAsync(key, json);
         }
 
-        // Simple versioning approach for cache invalidation
         public async Task<string> GetVersionAsync(string prefix)
         {
             var key = $"{prefix}:version";

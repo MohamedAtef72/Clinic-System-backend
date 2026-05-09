@@ -16,16 +16,21 @@ namespace Clinic_System.Infrastructure.Repositories
         {
             _db = db;
         }
-        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsAsync(string? searchName, string? gender, int pageNumber, int pageSize)
         {
             var query = _db.Patients
+                .AsNoTracking()
                 .Include(p => p.User)
-                .Include(p => p.Appointments)
                 .AsQueryable();
 
             if(!String.IsNullOrEmpty(searchName))
             {
                 query = query.Where(a => a.User.UserName.Contains(searchName));
+            }
+
+            if(!String.IsNullOrEmpty(gender))
+            {
+                query = query.Where(a => a.User.Gender == gender);
             }
 
             var totalCount = await query.CountAsync();
@@ -50,29 +55,25 @@ namespace Clinic_System.Infrastructure.Repositories
 
             return (patients, totalCount);
         }
-
         public async Task<IEnumerable<Patient>> GetAllPatientsAsync()
         {
             return await _db.Patients
+                .AsNoTracking()
                 .Include(p => p.User)
-                .Include(p => p.Appointments)
                 .ToListAsync();
         }
-        // Get Patient From DB
         public async Task<Patient> GetPatientByIdAsync(Guid id)
         {
             return await _db.Patients
+                .AsNoTracking()
                         .IgnoreQueryFilters()
                         .Include(p => p.User)
                         .FirstOrDefaultAsync(p => p.Id == id);
         }
-
         public async Task<Patient> GetPatientByUserIdAsync(string userId)
         {
             return await _db.Patients.Include(d => d.User).FirstOrDefaultAsync(e => e.UserId == userId);
         }
-
-        // Add Patient Async
         public async Task AddPatient(Patient newPatient)
         {
             if (newPatient != null)
@@ -81,8 +82,6 @@ namespace Clinic_System.Infrastructure.Repositories
                 await _db.SaveChangesAsync();
             }
         }
-
-        // Update Patient Async
         public async Task<IdentityResult> UpdatePatientAsync(string userId, UserEditProfile PatientEdit)
         {
             var patientFromDB = await _db.Patients.FirstOrDefaultAsync(p => p.UserId == userId);
@@ -90,29 +89,42 @@ namespace Clinic_System.Infrastructure.Repositories
             {
                 return IdentityResult.Failed(new IdentityError { Description = "Patient not found." });
             }
+            bool isUpdated = false;
+            if (PatientEdit.BloodType != null && patientFromDB.BloodType != PatientEdit.BloodType)
+            {
+                patientFromDB.BloodType = PatientEdit.BloodType;
+                isUpdated = true;
+            }
+            if (PatientEdit.MedicalHistory != null && patientFromDB.MedicalHistory != PatientEdit.MedicalHistory)
+            {
+                patientFromDB.MedicalHistory = PatientEdit.MedicalHistory;
+                isUpdated = true;
+            }
 
-            patientFromDB.MedicalHistory = PatientEdit.MedicalHistory;
+            if (!isUpdated)
+            {
+                return IdentityResult.Failed(new IdentityError { Description = "No changes detected." });
+            }
 
-            _db.Patients.Update(patientFromDB);
-            var changes = await _db.SaveChangesAsync();
+            await _db.SaveChangesAsync();
 
-            if (changes > 0)
-                return IdentityResult.Success;
-
-            return IdentityResult.Failed(new IdentityError { Description = "No changes were made." });
+            return IdentityResult.Success;
         }
-
-        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, int pageNumber, int pageSize)
+        public async Task<(List<PatientInfoDTO> Patients, int TotalCount)> GetAllPatientsWithDeletedAsync(string? searchName, string? gender, int pageNumber, int pageSize)
         {
             var query = _db.Patients
+                .AsNoTracking()
                 .IgnoreQueryFilters()
                 .Include(p => p.User)
-                .Include(p => p.Appointments)
                 .AsQueryable();
 
             if (!String.IsNullOrEmpty(searchName))
             {
                 query = query.Where(a => a.User.UserName.Contains(searchName));
+            }
+            if (!String.IsNullOrEmpty(gender))
+            {
+                query = query.Where(a => a.User.Gender == gender);
             }
 
             var totalCount = await query.CountAsync();
@@ -139,7 +151,6 @@ namespace Clinic_System.Infrastructure.Repositories
 
             return (patients, totalCount);
         }
-
         public async Task<Patient?> GetByUserIdAsync(string userId, bool includeDeleted = false)
         {
             var query = _db.Patients.AsQueryable();
@@ -149,7 +160,6 @@ namespace Clinic_System.Infrastructure.Repositories
 
             return await query.FirstOrDefaultAsync(d => d.UserId == userId);
         }
-
         public async Task SaveChanges()
         {
             await _db.SaveChangesAsync();

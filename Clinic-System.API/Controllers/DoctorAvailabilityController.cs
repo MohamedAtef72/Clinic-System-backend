@@ -4,6 +4,7 @@ using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -14,49 +15,48 @@ namespace Clinic_System.API.Controllers
     {
         private readonly IDoctorAvailabilityService _availabilityService;
         private readonly ILogger<DoctorAvailabilityController> _logger;
+        private readonly ICacheService _cache;
 
         public DoctorAvailabilityController(
             IDoctorAvailabilityService availabilityService,
-            ILogger<DoctorAvailabilityController> logger)
+            ILogger<DoctorAvailabilityController> logger,
+            ICacheService cache)
         {
-            _availabilityService = availabilityService ?? throw new ArgumentNullException(nameof(availabilityService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _availabilityService = availabilityService;
+            _logger = logger;
+            _cache = cache;
         }
 
         [HttpGet("GetAll")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAll()
         {
             try
             {
-                var availabilities = await _availabilityService.GetAllAvailabilitiesAsync();
-
-                if (availabilities == null || !availabilities.Any())
+                var version = await _cache.GetVersionAsync("doctoravailability:all");
+                var cacheKey = $"doctoravailability:all:{version}";
+                var availabilities = await _cache.GetAsync<object>(cacheKey);
+                if (availabilities == null)
                 {
-                    return Ok(new
+                    var fresh = await _availabilityService.GetAllAvailabilitiesAsync();
+                    if (fresh == null || !fresh.Any())
                     {
-                        Message = "No availabilities found",
-                        Data = new List<object>()
-                    });
+                        return Ok(new { Message = "No availabilities found", Data = new List<object>() });
+                    }
+                    await _cache.SetAsync(cacheKey, new { Message = "Availabilities retrieved successfully", Data = fresh, Count = fresh.Count() }, TimeSpan.FromMinutes(5));
+                    availabilities = new { Message = "Availabilities retrieved successfully", Data = fresh, Count = fresh.Count() };
                 }
-
-                return Ok(new
-                {
-                    Message = "Availabilities retrieved successfully",
-                    Data = availabilities,
-                    Count = availabilities.Count()
-                });
+                return Ok(availabilities);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving all doctor availabilities");
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while retrieving availabilities"
-                });
+                return StatusCode(500, new { Message = "An error occurred while retrieving availabilities" });
             }
         }
 
         [HttpGet("doctor/{doctorId}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetByDoctor([Required] Guid doctorId)
         {
             try
@@ -67,15 +67,16 @@ namespace Clinic_System.API.Controllers
                 if (doctorId == Guid.Empty)
                     return BadRequest(new { Message = "Doctor ID cannot be empty" });
 
-                var availabilities = await _availabilityService.GetAvailabilitiesByDoctorAsync(doctorId);
-
-                return Ok(new
+                var version = await _cache.GetVersionAsync($"doctoravailability:doctor:{doctorId}");
+                var cacheKey = $"doctoravailability:doctor:{doctorId}:{version}";
+                var availabilities = await _cache.GetAsync<object>(cacheKey);
+                if (availabilities == null)
                 {
-                    Message = "Doctor availabilities retrieved successfully",
-                    Data = availabilities,
-                    DoctorId = doctorId,
-                    Count = availabilities?.Count() ?? 0
-                });
+                    var fresh = await _availabilityService.GetAvailabilitiesByDoctorAsync(doctorId);
+                    availabilities = new { Message = "Doctor availabilities retrieved successfully", Data = fresh, DoctorId = doctorId, Count = fresh?.Count() ?? 0 };
+                    await _cache.SetAsync(cacheKey, availabilities, TimeSpan.FromMinutes(5));
+                }
+                return Ok(availabilities);
             }
             catch (ArgumentException ex)
             {
@@ -85,14 +86,12 @@ namespace Clinic_System.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving availabilities for doctor: {DoctorId}", doctorId);
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while retrieving doctor availabilities"
-                });
+                return StatusCode(500, new { Message = "An error occurred while retrieving doctor availabilities" });
             }
         }
 
         [HttpGet("{id}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetById([Range(1, int.MaxValue, ErrorMessage = "ID must be a positive number")] int id)
         {
             try
@@ -100,24 +99,23 @@ namespace Clinic_System.API.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                var availability = await _availabilityService.GetAvailabilityByIdAsync(id);
-
+                var version = await _cache.GetVersionAsync($"doctoravailability:id:{id}");
+                var cacheKey = $"doctoravailability:id:{id}:{version}";
+                var availability = await _cache.GetAsync<object>(cacheKey);
                 if (availability == null)
-                    return NotFound(new { Message = $"Doctor availability with ID {id} not found" });
-
-                return Ok(new
                 {
-                    Message = "Doctor availability retrieved successfully",
-                    Data = availability
-                });
+                    var fresh = await _availabilityService.GetAvailabilityByIdAsync(id);
+                    if (fresh == null)
+                        return NotFound(new { Message = $"Doctor availability with ID {id} not found" });
+                    availability = new { Message = "Doctor availability retrieved successfully", Data = fresh };
+                    await _cache.SetAsync(cacheKey, availability, TimeSpan.FromMinutes(5));
+                }
+                return Ok(availability);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving doctor availability with ID: {Id}", id);
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while retrieving the availability"
-                });
+                return StatusCode(500, new { Message = "An error occurred while retrieving the availability" });
             }
         }
         [HttpPost("Add")]
@@ -138,7 +136,9 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Valid doctor ID is required" });
 
                 await _availabilityService.AddAvailabilityAsync(dto);
-
+                // Invalidate all related cache
+                await _cache.BumpVersionAsync("doctoravailability:all");
+                await _cache.BumpVersionAsync($"doctoravailability:doctor:{dto.DoctorId}");
                 return Ok(new { Message = "Doctor availability (including recurrence if any) added successfully" });
             }
             catch (Exception ex)
@@ -147,7 +147,6 @@ namespace Clinic_System.API.Controllers
                 return StatusCode(500, new { Message = ex.Message });
             }
         }
-
 
         [HttpPut("Update/{id}")]
         public async Task<IActionResult> Update(
@@ -176,7 +175,10 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Availability must be within reasonable hours (6 AM - 11 PM)" });
 
                 await _availabilityService.UpdateAvailabilityAsync(id, dto.StartTime, dto.EndTime);
-
+                // Invalidate all related cache
+                await _cache.BumpVersionAsync("doctoravailability:all");
+                await _cache.BumpVersionAsync($"doctoravailability:doctor:{dto.DoctorId}");
+                await _cache.BumpVersionAsync($"doctoravailability:id:{id}");
                 _logger.LogInformation("Doctor availability updated successfully: {Id}", id);
                 return Ok(new { Message = "Doctor availability updated successfully" });
             }
@@ -193,10 +195,7 @@ namespace Clinic_System.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating doctor availability: {Id}", id);
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while updating the availability"
-                });
+                return StatusCode(500, new { Message = "An error occurred while updating the availability" });
             }
         }
 
@@ -214,7 +213,13 @@ namespace Clinic_System.API.Controllers
                     return NotFound(new { Message = $"Doctor availability with ID {id} not found" });
 
                 await _availabilityService.DeleteAvailabilityAsync(id);
-
+                // Invalidate all related cache
+                await _cache.BumpVersionAsync("doctoravailability:all");
+                if (existingAvailability != null)
+                {
+                    await _cache.BumpVersionAsync($"doctoravailability:doctor:{existingAvailability.Id}");
+                }
+                await _cache.BumpVersionAsync($"doctoravailability:id:{id}");
                 _logger.LogInformation("Doctor availability deleted successfully: {Id}", id);
                 return Ok(new { Message = "Doctor availability deleted successfully" });
             }
@@ -226,10 +231,7 @@ namespace Clinic_System.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error deleting doctor availability: {Id}", id);
-                return StatusCode(500, new
-                {
-                    Message = "An error occurred while deleting the availability"
-                });
+                return StatusCode(500, new { Message = "An error occurred while deleting the availability" });
             }
         }
     }

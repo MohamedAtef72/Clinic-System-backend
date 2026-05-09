@@ -1,7 +1,9 @@
-﻿using Clinic_System.Application.Interfaces;
+﻿using Clinic_System.Application.DTO;
+using Clinic_System.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Runtime.CompilerServices;
 
 namespace Clinic_System.API.Controllers
@@ -12,24 +14,26 @@ namespace Clinic_System.API.Controllers
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
+        private readonly ICacheService _cache;
 
-        public AdminController(IAdminService adminService)
+        public AdminController(IAdminService adminService, ICacheService cache)
         {
             _adminService = adminService;
+            _cache = cache;
         }
 
         [HttpGet("Dashboard")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetDashboardInfo()
         {
             try
             {
-                var dashboardInfo = await _adminService.GetDashboardInfo();
-                if (dashboardInfo == null)
-                {
-                    return NotFound("Data Not Found");
-                }
+               var freshData = await _adminService.GetDashboardInfo();
 
-                return Ok(new {Message = "Data Retreive Successfully" , Data = dashboardInfo});
+               if (freshData == null)
+                   return NotFound("Data Not Found");
+
+               return Ok(new { Message = "Data Retreive Successfully", Data = freshData });
             }
             catch (Exception ex)
             {
@@ -42,21 +46,19 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpGet("RecentData")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetRecentActivity()
         {
             try
             {
+                var freshData = await _adminService.GetRecentActivityData();
 
-                var model = await _adminService.GetRecentActivityData();
-
-                if (model == null)
-                {
+                if (freshData == null)
                     return NotFound("Data Not Found");
-                }
 
-                return Ok(new {Message = "Data Retrieve Successfully" , Data = model});
-
-            }catch (Exception ex)
+                return Ok(new { Message = "Data Retrieve Successfully", Data = freshData });
+            }
+            catch (Exception ex)
             {
                 return BadRequest(new
                 {

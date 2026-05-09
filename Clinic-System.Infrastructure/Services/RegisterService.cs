@@ -4,6 +4,8 @@ using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace Clinic_System.Infrastructure.Services
 {
@@ -11,19 +13,28 @@ namespace Clinic_System.Infrastructure.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IPhotoService _photoService;
+        private readonly ILogger<RegisterService> _logger;
 
-        public RegisterService(UserManager<ApplicationUser> userManager, IPhotoService photoService)
+        public RegisterService(UserManager<ApplicationUser> userManager, IPhotoService photoService, ILogger<RegisterService> logger)
         {
             _userManager = userManager;
             _photoService = photoService;
+            _logger = logger;
         }
 
-        public async Task<(string? Error, ApplicationUser? existingUser)> RegisterUserAsync(UserRegisterBase dto, IFormFile image, string role)
+        public async Task<(string? Error, ApplicationUser? existingUser)> RegisterUserAsync(UserRegisterBase dto, string role)
         {
+            var sw = Stopwatch.StartNew();
+
             var email = dto.Email;
+
+            // Track: Email Check
             var existingUser = await _userManager.Users
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.Email == email);
+
+            _logger.LogInformation("Email check: {Time}ms", sw.ElapsedMilliseconds);
+            sw.Restart();
 
             if (existingUser != null)
             {
@@ -34,9 +45,11 @@ namespace Clinic_System.Infrastructure.Services
                     existingUser.DeletedAt = null;
 
                     if (dto.Password != dto.ConfirmPassword)
+                    {
+                        _logger.LogWarning("[REGISTER_SERVICE] Password mismatch during reactivation");
                         return ("Passwords do not match", null);
+                    }
 
-                    var url = await _photoService.UploadImageAsync(image);
 
                     existingUser.UserName = dto.UserName;
                     existingUser.Email = dto.Email;
@@ -45,37 +58,59 @@ namespace Clinic_System.Infrastructure.Services
                     existingUser.Gender = dto.Gender;
                     existingUser.DateOfBirth = dto.DateOfBirth;
                     existingUser.RegisterDate = dto.RegisterDate;
-                    existingUser.ImagePath = url;
+                    existingUser.ImagePath = dto.ImagePath;
 
-                    // Reset password
+                    // Track: Password Reset
                     var token = await _userManager.GeneratePasswordResetTokenAsync(existingUser);
+                    _logger.LogInformation("Password reset token generated: {Time}ms", sw.ElapsedMilliseconds);
+                    sw.Restart();
+
                     var resetResult = await _userManager.ResetPasswordAsync(existingUser, token, dto.Password);
+                    _logger.LogInformation("Password reset completed: {Time}ms", sw.ElapsedMilliseconds);
+                    sw.Restart();
+
                     if (!resetResult.Succeeded)
                     {
                         var errors = string.Join(", ", resetResult.Errors.Select(e => e.Description));
+                        _logger.LogError("[REGISTER_SERVICE] Password reset failed: {Errors}", errors);
                         return (errors, null);
                     }
 
+                    // Track: User Update
                     await _userManager.UpdateAsync(existingUser);
+                    _logger.LogInformation("User update completed: {Time}ms", sw.ElapsedMilliseconds);
+                    sw.Restart();
 
                     // Ensure user is in the correct role
                     var roles = await _userManager.GetRolesAsync(existingUser);
+                    _logger.LogInformation("User roles retrieved: {Time}ms", sw.ElapsedMilliseconds);
+                    sw.Restart();
+
                     if (!roles.Contains(role))
+                    {
+                        _logger.LogInformation("[REGISTER_SERVICE] Adding role {Role} to user", role);
                         await _userManager.AddToRoleAsync(existingUser, role);
+                    }
 
                     return (null, existingUser);
                 }
                 else
                 {
-                    // Email already in use by active user
+                    _logger.LogWarning("[REGISTER_SERVICE] Email already in use by active user");
                     return ("Email already in use", null);
                 }
             }
 
             if (dto.Password != dto.ConfirmPassword)
+            {
+                _logger.LogWarning("[REGISTER_SERVICE] Password mismatch for new user");
                 return ("Passwords do not match", null);
+            }
 
-            var urlNew = await _photoService.UploadImageAsync(image);
+            // Track: Image Upload for New User
+            //var urlNew = await _photoService.UploadImageAsync(dto.Image);
+            //_logger.LogInformation("Image upload for new user: {Time}ms", sw.ElapsedMilliseconds);
+            //sw.Restart();
 
             var user = new ApplicationUser
             {
@@ -86,14 +121,25 @@ namespace Clinic_System.Infrastructure.Services
                 Gender = dto.Gender,
                 DateOfBirth = dto.DateOfBirth,
                 RegisterDate = dto.RegisterDate,
-                ImagePath = urlNew
+                ImagePath = dto.ImagePath
             };
 
+            // Track: User Creation
             var result = await _userManager.CreateAsync(user, dto.Password);
-            if (!result.Succeeded)
-                return ("Password is not strong", null);
+            _logger.LogInformation("User creation: {Time}ms", sw.ElapsedMilliseconds);
+                        sw.Restart();
 
+            if (!result.Succeeded)
+            {
+                _logger.LogError("[REGISTER_SERVICE] User creation failed");
+                return ("Password is not strong", null);
+            }
+
+            // Track: Role Assignment
             await _userManager.AddToRoleAsync(user, role);
+            _logger.LogInformation("Role assignment: {Time}ms", sw.ElapsedMilliseconds);
+                        sw.Restart();
+
             return (null, user);
         }
     }

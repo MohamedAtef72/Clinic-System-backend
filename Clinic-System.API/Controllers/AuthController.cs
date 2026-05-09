@@ -1,20 +1,18 @@
-﻿using AutoMapper.Internal;
-using Clinic_System.Application.DTO;
+﻿using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Constant;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
-using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Newtonsoft.Json.Linq;
-using Sprache;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -27,19 +25,20 @@ namespace Clinic_System.API.Controllers
     {
         private readonly IDoctorService _doctorService;
         private readonly IPatientService _patientService;
-        private readonly PatientRepository _patientRepository;
-        private readonly ReceptionistRepository _receptionistRepository;
+        private readonly IReceptionistService _receptionistService;
         private readonly IRegisterService _registerService;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IConfiguration _config;
         private readonly IAuthService _authService;
         private readonly ILogger<AuthController> _logger;
         private readonly IMailingServices _mailingServices;
-        private readonly AppDbContext _context;
+        private readonly ICacheService _cache;
+        private readonly IPhotoService _photoService;
+
 
         public AuthController(
-            PatientRepository patientRepository,
-            ReceptionistRepository receptionistRepository,
+            IPatientService patientService,
+            IReceptionistService receptionistService,
             IRegisterService registerService,
             UserManager<ApplicationUser> userManager,
             IConfiguration config,
@@ -47,56 +46,78 @@ namespace Clinic_System.API.Controllers
             ILogger<AuthController> logger,
             IMailingServices mailingServices,
             IDoctorService doctorService,
-            IPatientService patientService,
-            AppDbContext context)
+            ICacheService cache,
+            IPhotoService photoService)
         {
-            _patientRepository = patientRepository ?? throw new ArgumentNullException(nameof(patientRepository));
-            _receptionistRepository = receptionistRepository ?? throw new ArgumentNullException(nameof(receptionistRepository));
-            _registerService = registerService ?? throw new ArgumentNullException(nameof(registerService));
-            _userManager = userManager ?? throw new ArgumentNullException(nameof(userManager));
-            _config = config ?? throw new ArgumentNullException(nameof(config));
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _mailingServices = mailingServices ?? throw new ArgumentNullException(nameof(mailingServices));
-            _doctorService = doctorService ?? throw new ArgumentNullException(nameof(doctorService));
-            _patientService = patientService ?? throw new ArgumentNullException(nameof(patientService));
-            _context = context;
+            _receptionistService = receptionistService ;
+            _registerService = registerService ;
+            _userManager = userManager;
+            _cache = cache ;
+            _config = config ;
+            _authService = authService ;
+            _logger = logger ;
+            _mailingServices = mailingServices ;
+            _doctorService = doctorService ;
+            _patientService = patientService ;
+            _photoService = photoService;
         }
 
         [HttpPost("DoctorRegister")]
         [Authorize(Roles = Role.Admin)]
-        public async Task<IActionResult> DoctorRegister([FromForm] DoctorRegisterDTO doctorRegister)
+        public async Task<IActionResult> DoctorRegister([FromBody]DoctorRegisterDTO doctorRegister)
         {
             try
             {
+
                 if (doctorRegister == null)
+                {
+                    _logger.LogWarning("[DOCTOR_REGISTER] Null registration data received");
                     return BadRequest(new { Message = "Doctor registration data is required" });
+                }
 
                 if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("[DOCTOR_REGISTER] Invalid model state");
                     return BadRequest(new { Message = "Invalid data", Errors = ModelState });
+                }
 
                 if (doctorRegister.SpecialityId <= 0)
+                {
+                    _logger.LogWarning("[DOCTOR_REGISTER] Invalid speciality ID: {SpecialityId}", doctorRegister.SpecialityId);
                     return BadRequest(new { Message = "Valid speciality is required" });
+                }
 
+                var sw = Stopwatch.StartNew();
+                // Track: User Registration
                 var (error, user) = await _registerService.RegisterUserAsync(
-                    doctorRegister, doctorRegister.Image, "Doctor");
+                    doctorRegister, "Doctor");
+
+                _logger.LogInformation("Register User: {Time}ms", sw.ElapsedMilliseconds);
+                sw.Restart();
 
                 if (error != null)
                 {
-                    _logger.LogWarning("Doctor registration failed: {Error}", error);
+                    _logger.LogWarning("[DOCTOR_REGISTER] Registration failed: {Error}", error);
                     return BadRequest(new { Message = "Registration failed", Error = error });
                 }
+                _logger.LogInformation("[DOCTOR_REGISTER] User created successfully. UserId: {UserId}", user?.Id);
 
-                // Use this method (handles create OR restore)
+                // Track: Doctor Creation/Restoration
                 var doctor = await _doctorService.EnsureDoctorExistsOrRestoreAsync(
                     user.Id, doctorRegister.SpecialityId);
 
-                // Send Email (only if new or restored)
+                _logger.LogInformation("Ensure Doctor Exists/Restored: {Time}ms", sw.ElapsedMilliseconds);
+                sw.Restart();
+
+                await _cache.BumpVersionAsync("doctors:list");
+                await _cache.BumpVersionAsync("admin:dashboard");
+
+                // Track: Email Sending
                 var body = $@"
                                 <!DOCTYPE html>
                                 <html>
                                   <body>
-                                    <h2>Welcome to Clinic-System 👩‍⚕️</h2>
+                                    <h2>Welcome to Clinic-System</h2>
                                     <p>Dear Doctor,</p>
                                     <p>Your account has been successfully created.</p>
                                     <p><b>Email:</b> {doctorRegister.Email}</p>
@@ -113,15 +134,17 @@ namespace Clinic_System.API.Controllers
                     Attachments = null
                 };
 
-                await _mailingServices.SendEmailAsync(
-                    mailRequest.ToEmail,
-                    mailRequest.Subject,
-                    mailRequest.Body,
-                    mailRequest.Attachments
-
+                BackgroundJob.Enqueue(() =>
+                    _mailingServices.SendEmailAsync(
+                        mailRequest.ToEmail,
+                        mailRequest.Subject,
+                        mailRequest.Body,
+                        mailRequest.Attachments
+                    )
                 );
 
-                _logger.LogInformation("Doctor registered/restored successfully with ID: {UserId}", user.Id);
+                _logger.LogInformation("Email sending enqueued: {Time}ms", sw.ElapsedMilliseconds);
+
 
                 return Ok(new
                 {
@@ -131,77 +154,90 @@ namespace Clinic_System.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Doctor registration error");
-                return StatusCode(500, new { Message = ex.Message,
-                    StackTrace = ex.StackTrace
-                });
+                _logger.LogError($"[DOCTOR_REGISTER] Unexpected error during doctor registration {ex.Message}");
+                return StatusCode(500, new { Message = ex.Message, StackTrace = ex.StackTrace });
             }
         }
         [HttpPost("PatientRegister")]
-        public async Task<IActionResult> PatientRegister([FromForm][Required] PatientRegisterDTO patientRegister)
+        [EnableRateLimiting("AuthPolicy")]
+        public async Task<IActionResult> PatientRegister([FromBody]PatientRegisterDTO patientRegister)
         {
             try
             {
+
                 if (patientRegister == null)
+                {
+                    _logger.LogWarning("[PATIENT_REGISTER] Null registration data received");
                     return BadRequest(new { Message = "Patient registration data is required" });
+                }
 
                 if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("[PATIENT_REGISTER] Invalid model state");
                     return BadRequest(new { Message = "Invalid data", Errors = ModelState });
+                }
 
-                var (error, user) = await _registerService.RegisterUserAsync(patientRegister, patientRegister.Image, "Patient");
+                // Track: User Registration
+                var (error, user) = await _registerService.RegisterUserAsync(patientRegister, "Patient");
 
                 if (error != null)
                 {
-                    _logger.LogWarning("Patient registration failed: {Error}", error);
+                    _logger.LogWarning("[PATIENT_REGISTER] Registration failed: {Error}", error);
                     return BadRequest(new { Message = "Registration failed", Error = error });
                 }
 
+                // Track: Patient Creation/Restoration
                 var patient = await _patientService.EnsurePatientExistsOrRestoreAsync(
                     user.Id, patientRegister.BloodType, patientRegister.MedicalHistory);
 
-                _logger.LogInformation("Patient registered successfully with ID: {UserId}", user.Id);
+                // Track: Cache Invalidation
+                await _cache.BumpVersionAsync("patients:list");
+
                 return CreatedAtAction(nameof(PatientRegister), new { Message = "Patient registered successfully", UserId = user.Id });
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogError(ex, "Invalid argument during patient registration");
-                return BadRequest(new { Message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Operation error during patient registration");
-                return Conflict(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during patient registration");
-                return StatusCode(500, new { Message = "An error occurred during registration" });
+                _logger.LogError($"[PATIENT_REGISTER] Unexpected error during patient registration {ex.Message}");
+                return StatusCode(500, new { Message = ex.Message });
             }
         }
 
         [HttpPost("ReceptionRegister")]
-        public async Task<IActionResult> ReceptionistRegister([FromForm][Required] ReceptionistRegisterDTO receptionistRegister)
+        [EnableRateLimiting("AuthPolicy")]
+        public async Task<IActionResult> ReceptionistRegister([FromBody] ReceptionistRegisterDTO receptionistRegister)
         {
             try
             {
+
                 if (receptionistRegister == null)
+                {
+                    _logger.LogWarning("[RECEPTIONIST_REGISTER] Null registration data received");
                     return BadRequest(new { Message = "Receptionist registration data is required" });
+                }
 
                 if (!ModelState.IsValid)
+                {
+                    _logger.LogWarning("[RECEPTIONIST_REGISTER] Invalid model state");
                     return BadRequest(new { Message = "Invalid data", Errors = ModelState });
+                }
 
                 // Additional business validation
                 if (receptionistRegister.ShiftStart >= receptionistRegister.ShiftEnd)
+                {
+                    _logger.LogWarning("[RECEPTIONIST_REGISTER] Invalid shift times - Start: {ShiftStart}, End: {ShiftEnd}", 
+                        receptionistRegister.ShiftStart, receptionistRegister.ShiftEnd);
                     return BadRequest(new { Message = "Shift start time must be before shift end time" });
+                }
 
-                var (error, user) = await _registerService.RegisterUserAsync(receptionistRegister, receptionistRegister.Image, "Receptionist");
+                // Track: User Registration
+                var (error, user) = await _registerService.RegisterUserAsync(receptionistRegister, "Receptionist");
 
                 if (error != null)
                 {
-                    _logger.LogWarning("Receptionist registration failed: {Error}", error);
+                    _logger.LogWarning("[RECEPTIONIST_REGISTER] Registration failed: {Error}", error);
                     return BadRequest(new { Message = "Registration failed", Error = error });
                 }
-
+                // Track: Receptionist Creation
                 var receptionist = new Receptionist
                 {
                     UserId = user.Id,
@@ -209,13 +245,13 @@ namespace Clinic_System.API.Controllers
                     ShiftEnd = receptionistRegister.ShiftEnd
                 };
 
-                await _receptionistRepository.AddReceptionist(receptionist);
-
+                await _receptionistService.AddReceptionist(receptionist);
+                // Track: Email Sending
                 var body = $@"
                         <!DOCTYPE html>
                         <html>
                           <body>
-                            <h2>Welcome to Clinic-System 👩‍⚕️</h2>
+                            <h2>Welcome to Clinic-System </h2>
                             <p>Dear Receptionist,</p>
                             <p>Your account has been successfully created.</p>
                             <p><b>Email:</b> {receptionistRegister.Email}</p>
@@ -232,275 +268,163 @@ namespace Clinic_System.API.Controllers
                     Attachments = null
                 };
 
-                await _mailingServices.SendEmailAsync(
+                BackgroundJob.Enqueue(() =>
+                    _mailingServices.SendEmailAsync(
                     mailRequest.ToEmail,
                     mailRequest.Subject,
                     mailRequest.Body,
                     mailRequest.Attachments
+                    )
                 );
 
-                _logger.LogInformation("Receptionist registered successfully with ID: {UserId}", user.Id);
                 return CreatedAtAction(nameof(ReceptionistRegister), new { Message = "Receptionist registered successfully", UserId = user.Id });
-            }
-            catch (ArgumentException ex)
-            {
-                _logger.LogError(ex, "Invalid argument during receptionist registration");
-                return BadRequest(new { Message = ex.Message });
-            }
-            catch (InvalidOperationException ex)
-            {
-                _logger.LogError(ex, "Operation error during receptionist registration");
-                return Conflict(new { Message = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during receptionist registration");
-                return StatusCode(500, new { Message = "An error occurred during registration" });
+                _logger.LogError($"[RECEPTIONIST_REGISTER] Unexpected error during receptionist registration {ex.Message}");
+                return StatusCode(500, new { Message = ex.Message });
             }
         }
 
         [HttpPost("Login")]
+        [EnableRateLimiting("AuthPolicy")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             try
             {
-                // Validate request
                 if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
                 {
                     return BadRequest(new { Message = "Email and password are required" });
                 }
 
-                _logger.LogInformation("Login attempt for email: {Email}", request.Email);
+                var normalizedEmail = request.Email.ToUpper();
+                var user = await _userManager.FindByEmailAsync(normalizedEmail); 
 
-                // Find user by email
-                var user = await _userManager.FindByEmailAsync(request.Email);
-                if (user == null)
+                if (user == null || user.IsDeleted)
                 {
-                    _logger.LogWarning("Login failed: User not found for email: {Email}", request.Email);
                     return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                // Check password
-                var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
-                if (!passwordValid)
+                var validPassword = await _userManager.CheckPasswordAsync(user, request.Password); 
+
+                if (!validPassword)
                 {
-                    _logger.LogWarning("Login failed: Invalid password for email: {Email}", request.Email);
                     return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                // Generate tokens
-                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var result = await _authService.GenerateTokenAsync(user, clientIp);
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"; 
 
-                if (result == null)
-                {
-                    _logger.LogError("Failed to generate tokens for user: {Email}", request.Email);
-                    return StatusCode(500, new { Message = "Failed to generate authentication tokens" });
-                }
-
-                // Parse JWT to get expiration
-                var jwtHandler = new JwtSecurityTokenHandler();
-                var jwtToken = jwtHandler.ReadJwtToken(result.AccessToken);
-
-                // Set cookies using the result object
-                Response.Cookies.Append("t", result.AccessToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = "/",
-                    Expires = jwtToken.ValidTo
-                });
-
-                Response.Cookies.Append("rt", result.RefreshToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = "/",
-                    Expires = DateTime.UtcNow.AddDays(7)
-                });
-
-                // Add CORS headers
-                Response.Headers.Add("Access-Control-Allow-Credentials", "true");
-
-                _logger.LogInformation("Login successful for user: {Email}", request.Email);
-                _logger.LogInformation("Access token expires at: {ExpiryTime}", jwtToken.ValidTo);
+                var result = await _authService.GenerateTokenAsync(user, clientIp, Response); 
 
                 return Ok(new
                 {
                     Message = "Login successful",
-                    ExpiresAt = jwtToken.ValidTo
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during login");
-                return StatusCode(500, new { Message = "An error occurred during login" });
+                return StatusCode(500, new { Message = "An error occurred during login", Error = ex.Message });
             }
         }
 
         [HttpPost("Refresh")]
+        [EnableRateLimiting("AuthPolicy")]
         public async Task<IActionResult> Refresh()
         {
             try
             {
-                _logger.LogInformation("Token refresh attempt started");
-
-                // Debug: Log all cookies received
-                _logger.LogInformation($"Total cookies received: {Request.Cookies.Count}");
+                // Log all cookies
                 foreach (var cookie in Request.Cookies)
                 {
-                    _logger.LogInformation($"Cookie: {cookie.Key} = {cookie.Value?.Substring(0, Math.Min(20, cookie.Value.Length))}...");
+                    var tokenPreview = cookie.Value?.Substring(0, Math.Min(20, cookie.Value.Length)) + "...";
                 }
 
-                // Read refresh token from cookies
-                if (!Request.Cookies.TryGetValue("rt", out var refreshToken) || string.IsNullOrWhiteSpace(refreshToken))
+                // 1. Get tokens from cookies
+                var accessToken = Request.Cookies["t"];
+                var refreshToken = Request.Cookies["rt"];
+
+                if (string.IsNullOrEmpty(refreshToken))
                 {
-                    _logger.LogWarning("Token refresh failed: Missing refresh token cookie");
-                    return BadRequest(new { Message = "Refresh token cookie is required" });
+                    return Unauthorized(new { Message = "Missing refresh token" });
                 }
 
-                // Try to get access token, but it might be expired/missing
-                Request.Cookies.TryGetValue("t", out var accessToken);
-
-                string userId = null;
-
-                // Try to extract user info from access token if available
-                if (!string.IsNullOrWhiteSpace(accessToken))
+                if (string.IsNullOrEmpty(accessToken))
                 {
-                    try
-                    {
-                        var principal = _authService.GetPrincipalFromExpiredToken(accessToken);
-                        userId = principal?.FindFirstValue(ClaimTypes.NameIdentifier);
-                        _logger.LogInformation("Extracted user ID from access token: {UserId}", userId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogInformation("Could not extract user from access token (this is normal): {Error}", ex.Message);
-                    }
+                    return Unauthorized(new { Message = "Missing access token" });
                 }
 
-                // If we couldn't get userId from token, find user by refresh token
-                ApplicationUser user;
+                // 2. Validate expired access token
+                var principal = _authService.GetPrincipalFromExpiredToken(accessToken);
 
-                if (!string.IsNullOrEmpty(userId))
+                if (principal == null)
                 {
-                    // Get user by ID from token
-                    user = await _userManager.Users
-                        .Include(u => u.RefreshTokens)
-                        .FirstOrDefaultAsync(u => u.Id == userId);
-                }
-                else
-                {
-                    // Find user by refresh token directly
-                    _logger.LogInformation("No valid access token, finding user by refresh token");
-
-                    // Find the refresh token in database first
-                    var refreshTokenEntity = await _context.RefreshTokens
-                        .Include(rt => rt.User)
-                        .ThenInclude(u => u.RefreshTokens)
-                        .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
-
-                    if (refreshTokenEntity == null)
-                    {
-                        _logger.LogWarning("Refresh token not found in database");
-                        return Unauthorized(new { Message = "Invalid refresh token" });
-                    }
-
-                    user = refreshTokenEntity.User;
-                    userId = user.Id;
-                    _logger.LogInformation("Found user by refresh token: {UserId}", userId);
+                    return Unauthorized(new { Message = "Invalid access token" });
                 }
 
-                if (user == null)
+                // 3. Get user identity
+                var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                if (string.IsNullOrEmpty(userId))
                 {
-                    _logger.LogWarning("User not found for refresh token");
+                    return Unauthorized(new { Message = "Invalid token claims" });
+                }
+
+                var user = await _userManager.FindByIdAsync(userId);
+
+                if (user == null || user.IsDeleted)
+                {
                     return Unauthorized(new { Message = "User not found" });
                 }
 
-                // Validate refresh token
-                var storedRefreshToken = user.RefreshTokens?.FirstOrDefault(rt => rt.Token == refreshToken);
-                if (storedRefreshToken == null)
+                // 4. Validate refresh token from DB
+                var savedToken = await _authService.GetSavedRefreshTokenAsync(user.UserName, refreshToken);
+
+                if (savedToken == null)
                 {
-                    _logger.LogWarning("Refresh token not found in user's tokens for user: {UserId}", userId);
                     return Unauthorized(new { Message = "Invalid refresh token" });
                 }
 
-                if (storedRefreshToken.ExpiryDate < DateTime.UtcNow)
+                if (savedToken.IsRevoked)
                 {
-                    _logger.LogWarning("Refresh token expired for user {UserId}. Expired at: {ExpiryDate}",
-                        userId, storedRefreshToken.ExpiryDate);
+                    return Unauthorized(new { Message = "Refresh token is revoked" });
+                }
 
-                    // Clean up expired token
-                    storedRefreshToken.ExpiryDate = DateTime.UtcNow.AddDays(7);
-                    await _userManager.UpdateAsync(user);
+                if (savedToken.ExpiryDate <= DateTime.UtcNow)
+                {
                     return Unauthorized(new { Message = "Refresh token expired" });
                 }
 
-                _logger.LogInformation("Refresh token validated successfully, generating new tokens");
+                // 5. IMPORTANT: revoke current refresh token
+                await _authService.RevokeRefreshToken(savedToken);
 
-                // Generate new tokens
+                // 6. Generate new tokens
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var result = await _authService.GenerateTokenAsync(user, clientIp);
-
-                if (result == null)
-                {
-                    _logger.LogError("Failed to generate new tokens for user: {UserId}", userId);
-                    return StatusCode(500, new { Message = "Failed to generate new tokens" });
-                }
-
-                // Remove old refresh token from database
-                user.RefreshTokens.Remove(storedRefreshToken);
-                await _userManager.UpdateAsync(user);
-
-                // Get new token expiration info
-                var jwtHandler = new JwtSecurityTokenHandler();
-                var jwtToken = jwtHandler.ReadJwtToken(result.AccessToken);
-
-                // Set new cookies
-                Response.Cookies.Append("t", result.AccessToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = "/",
-                    Expires = jwtToken.ValidTo,
-                });
-
-                Response.Cookies.Append("rt", result.RefreshToken, new CookieOptions
-                {
-                    HttpOnly = true,
-                    Secure = true,
-                    SameSite = SameSiteMode.None,
-                    Path = "/",
-                    Expires = DateTime.UtcNow.AddDays(7),
-                });
-
-                Response.Headers.Add("Access-Control-Allow-Credentials", "true");
-
-                _logger.LogInformation("Token refresh completed successfully for user: {UserId}", userId);
-                _logger.LogInformation("New access token expires at: {ExpiryTime}", jwtToken.ValidTo);
+                var result = await _authService.GenerateTokenAsync(user, clientIp, Response);
 
                 return Ok(new
                 {
                     Message = "Token refreshed successfully",
-                    ExpiresAt = jwtToken.ValidTo
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during token refresh");
-                return StatusCode(500, new { Message = "An error occurred while refreshing the token" });
+                return StatusCode(500, new
+                {
+                    Message = "Refresh failed",
+                    Error = ex.Message
+                });
             }
         }
+
         [HttpGet("Me")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetCurrentUser()
         {
             try
             {
                 var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
                 var id = "";
                 if(role == "Doctor")
                 {
@@ -508,7 +432,7 @@ namespace Clinic_System.API.Controllers
                     id = doctor.Id;
                 }else if(role == "Receptionist")
                 {
-                    var receptionist = await _receptionistRepository.GetReceptionistByUserIdAsync(userId);
+                    var receptionist = await _receptionistService.GetReceptionistByUserIdAsync(userId);
                     id = receptionist.Id.ToString();
                 }else if(role == "Patient")
                 {
@@ -523,24 +447,27 @@ namespace Clinic_System.API.Controllers
                 Console.WriteLine($"JWT Authentication Status: {User.Identity.IsAuthenticated}");
                 Console.WriteLine($"UserId: {userId}, Role: {role}, Email: {email}");
 
+                object response;
                 if (User.Identity.IsAuthenticated && userId != null && role != null)
                 {
-                    return Ok(new
+                    response = new
                     {
                         Message = "User Retrieved Successfully",
                         user = new { userId, id, role, email },
                         isAuthenticated = true
-                    });
+                    };
                 }
                 else
                 {
-                    return Ok(new
+                    response = new
                     {
                         Message = "User UN Authorized",
                         user = new { userId, role },
                         isAuthenticated = false
-                    });
+                    };
                 }
+                //await _cache.SetAsync(cacheKey, response, TimeSpan.FromMinutes(1));
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -664,6 +591,32 @@ namespace Clinic_System.API.Controllers
             {
                 _logger.LogError(ex, "Error resetting password for: {Email}", request?.Email);
                 return StatusCode(500, new { Message = "An error occurred while resetting the password" });
+            }
+        }
+
+        [HttpGet("GetUploadSignature")]
+        [EnableRateLimiting("ReadPolicy")]
+        public async Task<IActionResult> GetUploadSignature([FromQuery] string folder = "clinic_app_images")
+        {
+            try
+            {
+                _logger.LogInformation("[GET_UPLOAD_SIGNATURE] call method");
+
+                var signature = await _photoService.GetUploadSignatureAsync(folder);
+                _logger.LogInformation("[GET_UPLOAD_SIGNATURE] Signature is: {Signature}", signature);
+
+
+                _logger.LogInformation("[GET_UPLOAD_SIGNATURE] Signature generated successfully");
+                return Ok(new
+                {
+                    Message = "Upload signature generated successfully",
+                    Data = signature
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[GET_UPLOAD_SIGNATURE] Error generating upload signature");
+                return StatusCode(500, new { Message = "Failed to generate upload signature", Error = ex.Message });
             }
         }
 

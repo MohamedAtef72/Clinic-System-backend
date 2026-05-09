@@ -1,4 +1,5 @@
-﻿using Clinic_System.Infrastructure.Data;
+﻿using Clinic_System.Application.Interfaces;
+using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class AdminRepository
+    public class AdminRepository : IAdminRepository
     {
         private readonly AppDbContext _context;
 

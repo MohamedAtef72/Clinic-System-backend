@@ -1,10 +1,12 @@
-﻿using Clinic_System.Domain.Models;
+﻿using Clinic_System.Application.Interfaces;
+using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Numerics;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
-    public class DoctorAvailabilityRepository 
+    public class DoctorAvailabilityRepository : IDoctorAvailabilityRepository
     {
         private readonly AppDbContext _db;
 
@@ -64,17 +66,25 @@ namespace Clinic_System.Infrastructure.Repositories
 
         }
 
-        public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
+        //public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
+        //{
+        //    return await _db.DoctorAvailabilities
+        //        .Where(a => a.DoctorId == doctorId &&
+        //                    !_db.Appointments.Any(ap => ap.AvailabilityId == a.Id))
+        //        .ToListAsync();
+        //}
+
+        //public void RemoveRange(List<DoctorAvailability> availabilities)
+        //{
+        //    _db.DoctorAvailabilities.RemoveRange(availabilities);
+        //}
+
+        public async Task DeleteUnbookedByDoctorIdAsync(Guid doctorId)
         {
-            return await _db.DoctorAvailabilities
+            await _db.DoctorAvailabilities
                 .Where(a => a.DoctorId == doctorId &&
                             !_db.Appointments.Any(ap => ap.AvailabilityId == a.Id))
-                .ToListAsync();
-        }
-
-        public void RemoveRange(List<DoctorAvailability> availabilities)
-        {
-            _db.DoctorAvailabilities.RemoveRange(availabilities);
+                .ExecuteDeleteAsync();
         }
     }
 }

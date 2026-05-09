@@ -1,5 +1,6 @@
 ﻿using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
+using Clinic_System.Domain.Enums;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Repositories;
 
@@ -7,16 +8,16 @@ namespace Clinic_System.Application.Services
 {
     public class DoctorAvailabilityService : IDoctorAvailabilityService
     {
-        private readonly DoctorAvailabilityRepository _availabilityRepository;
+        private readonly IDoctorAvailabilityRepository _availabilityRepository;
 
-        public DoctorAvailabilityService(DoctorAvailabilityRepository availabilityRepository)
+        public DoctorAvailabilityService(IDoctorAvailabilityRepository availabilityRepository)
         {
             _availabilityRepository = availabilityRepository;
         }
 
         public async Task AddAvailabilityAsync(DoctorAvailabilityCreateDTO dto)
         {
-            if (string.IsNullOrEmpty(dto.RecurrencePattern) || dto.RecurrencePattern == "None")
+            if (dto.RecurrencePattern == RecurrencePattern.None)
             {
                 var singleAvailability = new DoctorAvailability
                 {
@@ -24,7 +25,7 @@ namespace Clinic_System.Application.Services
                     StartTime = dto.StartTime,
                     EndTime = dto.EndTime,
                     IsBooked = false,
-                    RecurrencePattern = "None"
+                    RecurrencePattern = RecurrencePattern.None
                 };
 
                 await _availabilityRepository.AddAsync(singleAvailability);
@@ -55,8 +56,8 @@ namespace Clinic_System.Application.Services
 
                 currentStart = dto.RecurrencePattern switch
                 {
-                    "Weekly" => currentStart.AddDays(7),
-                    "BiWeekly" => currentStart.AddDays(14),
+                    RecurrencePattern.Weekly => currentStart.AddDays(7),
+                    RecurrencePattern.BiWeekly => currentStart.AddDays(14),
                     _ => currentStart.AddDays(7) 
                 };
                 currentEnd = currentStart.Add(dto.EndTime - dto.StartTime);
@@ -71,6 +72,8 @@ namespace Clinic_System.Application.Services
                 Id = a.Id,
                 StartTime = a.StartTime,
                 EndTime = a.EndTime,
+                RecurrencePattern = a.RecurrencePattern,
+                RecurrenceEndDate = a.RecurrenceEndDate,
                 IsBooked = a.IsBooked,
             });
         }
@@ -83,6 +86,8 @@ namespace Clinic_System.Application.Services
                 Id = a.Id,
                 StartTime = a.StartTime,
                 EndTime = a.EndTime,
+                RecurrencePattern = a.RecurrencePattern,
+                RecurrenceEndDate = a.RecurrenceEndDate,
                 IsBooked = a.IsBooked,
             });
         }
@@ -97,6 +102,8 @@ namespace Clinic_System.Application.Services
                 Id = availability.Id,
                 StartTime = availability.StartTime,
                 EndTime = availability.EndTime,
+                RecurrencePattern = availability.RecurrencePattern,
+                RecurrenceEndDate = availability.RecurrenceEndDate,
                 IsBooked = availability.IsBooked,
             };
         }
@@ -117,14 +124,18 @@ namespace Clinic_System.Application.Services
             await _availabilityRepository.DeleteAsync(id);
         }
 
-        public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
-        {
-            return await _availabilityRepository.GetUnbookedByDoctorIdAsync(doctorId);
-        }
+        //public async Task<List<DoctorAvailability>> GetUnbookedByDoctorIdAsync(Guid doctorId)
+        //{
+        //    return await _availabilityRepository.GetUnbookedByDoctorIdAsync(doctorId);
+        //}
 
-        public void RemoveRange(List<DoctorAvailability> availabilities)
+        //public void RemoveRange(List<DoctorAvailability> availabilities)
+        //{
+        //    _availabilityRepository.RemoveRange(availabilities);
+        //}
+        public async Task DeleteUnbookedByDoctorIdAsync(Guid doctorId)
         {
-            _availabilityRepository.RemoveRange(availabilities);
+            await _availabilityRepository.DeleteUnbookedByDoctorIdAsync(doctorId);
         }
     }
 }

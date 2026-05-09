@@ -3,7 +3,7 @@ using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Linq.Expressions;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Clinic_System.API.Controllers
 {
@@ -13,16 +13,17 @@ namespace Clinic_System.API.Controllers
     public class DoctorController : ControllerBase
     {
         private readonly IDoctorService _doctorService;
-        private readonly Clinic_System.Application.Interfaces.ICacheService _cache;
+        private readonly ICacheService _cache;
 
-        public DoctorController(IDoctorService doctorService, Clinic_System.Application.Interfaces.ICacheService cache)
+        public DoctorController(IDoctorService doctorService, ICacheService cache)
         {
             _doctorService = doctorService;
             _cache = cache;
         }
 
         [HttpGet("AllDoctors")]
-        public async Task<IActionResult> GetAll([FromQuery] string? searchName, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 6 )
+        [EnableRateLimiting("ReadPolicy")]
+        public async Task<IActionResult> GetAll([FromQuery] string? searchName, [FromQuery] string? gender, [FromQuery] int? speciality, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 6 )
         {
             try
             {
@@ -33,7 +34,7 @@ namespace Clinic_System.API.Controllers
                 if (isAdmin)
                 {
                     // Admin: show all doctors (deleted and not deleted), bypass cache for correctness
-                    var (dList, tCount) = await _doctorService.GetAllDoctorsWithDeletedAsync(searchName, pageNumber, pageSize);
+                    var (dList, tCount) = await _doctorService.GetAllDoctorsWithDeletedAsync(searchName, gender, speciality, pageNumber, pageSize);
                     doctors = dList;
                     totalCount = tCount;
                 }
@@ -43,7 +44,7 @@ namespace Clinic_System.API.Controllers
                     var version = await _cache.GetVersionAsync("doctors:list");
                     var sanitizedSearch = string.IsNullOrEmpty(searchName) ? "" : searchName;
                     var cacheKey = $"doctors:list:{version}:{sanitizedSearch}:{pageNumber}:{pageSize}";
-                    var cached = await _cache.GetAsync<Clinic_System.Application.DTO.DoctorsListDto>(cacheKey);
+                    var cached = await _cache.GetAsync<DoctorsListDto>(cacheKey);
 
                     if (cached != null)
                     {
@@ -52,7 +53,7 @@ namespace Clinic_System.API.Controllers
                     }
                     else
                     {
-                        var (dList, tCount) = await _doctorService.GetAllDoctorsAsync(searchName, pageNumber, pageSize);
+                        var (dList, tCount) = await _doctorService.GetAllDoctorsAsync(searchName, gender, speciality, pageNumber, pageSize);
                         doctors = dList;
                         totalCount = tCount;
 
@@ -82,6 +83,7 @@ namespace Clinic_System.API.Controllers
             }
             }
         [HttpGet("{id}")]
+        [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetById(Guid id)
         {
             // Try cache first for doctor detail
@@ -91,7 +93,7 @@ namespace Clinic_System.API.Controllers
 
             DoctorInfoDTO doctor = null;
 
-            if (cached != null && cached.Availabilities?.Count > 0)
+            if (cached != null)
             {
                 doctor = cached;
             }
@@ -116,6 +118,9 @@ namespace Clinic_System.API.Controllers
             var result = await _doctorService.UpdateDoctorPriceAsync(id, model.Price);
             if (!result)
                 return NotFound(new { Message = "Doctor not found or price not updated." });
+
+            await _cache.BumpVersionAsync($"doctor:{id}");
+            await _cache.BumpVersionAsync("doctors:list");
 
             return Ok(new { Message = "Doctor price updated successfully." });
         }

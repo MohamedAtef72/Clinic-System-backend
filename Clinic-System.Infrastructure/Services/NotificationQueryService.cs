@@ -7,9 +7,9 @@ namespace Clinic_System.Infrastructure.Services
 {
     public class NotificationQueryService : INotificationQueryService
     {
-        private readonly NotificationRepository _repo;
+        private readonly INotificationRepository _repo;
 
-        public NotificationQueryService(NotificationRepository repo)
+        public NotificationQueryService(INotificationRepository repo)
         {
             _repo = repo;
         }

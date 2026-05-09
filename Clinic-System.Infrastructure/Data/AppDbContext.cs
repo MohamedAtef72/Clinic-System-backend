@@ -1,5 +1,6 @@
 ﻿using Clinic_System.Domain.Models;
 using Clinic_System.Domain.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection.Emit;
@@ -22,8 +23,8 @@ namespace Clinic_System.Infrastructure.Data
         public DbSet<DoctorAvailability> DoctorAvailabilities { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Rating> Rating { get; set; }
-        public DbSet<Clinic_System.Domain.Models.Notification> Notifications { get; set; }
-        public DbSet<Clinic_System.Domain.Models.UserNotification> UserNotifications { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
+        public DbSet<UserNotification> UserNotifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -36,11 +37,15 @@ namespace Clinic_System.Infrastructure.Data
 
             // Appointment soft delete
             builder.Entity<Appointment>();
-                //.HasQueryFilter(a => !a.IsDeleted);
+            //.HasQueryFilter(a => !a.IsDeleted);
 
             // Doctor availability must filter by IsActive and Doctor.User.IsDeleted
             builder.Entity<DoctorAvailability>()
                 .HasQueryFilter(a => a.IsActive && !a.Doctor.User.IsDeleted);
+
+            builder.Entity<DoctorAvailability>()
+                .Property(x => x.RecurrencePattern)
+                .HasConversion<string>();
 
             builder.Entity<Speciality>()
                 .HasIndex(s => s.Name)
@@ -96,7 +101,7 @@ namespace Clinic_System.Infrastructure.Data
                 .HasForeignKey<Visit>(v => v.AppointmentId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            builder.Entity<Clinic_System.Domain.Models.Notification>(b =>
+            builder.Entity<Notification>(b =>
             {
                 b.HasKey(n => n.Id);
                 b.Property(n => n.Title).IsRequired();
@@ -124,6 +129,12 @@ namespace Clinic_System.Infrastructure.Data
 
             builder.Entity<UserNotification>()
                 .HasIndex(un => un.NotificationId);
+
+            builder.Entity<IdentityUserRole<string>>()
+                .HasKey(x => new { x.UserId, x.RoleId });
+
+            builder.Entity<RefreshToken>()
+                .HasIndex(r => new { r.UserId, r.IsRevoked });  
         }
     }
 
