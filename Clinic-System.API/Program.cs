@@ -301,22 +301,40 @@ var app = builder.Build();
 // Seeder + Migrations
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext =
-        scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        var dbContext =
+            scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    dbContext.Database.Migrate();
+        // Check pending migrations before applying
+        var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
+        
+        if (pendingMigrations.Any())
+        {
+            await dbContext.Database.MigrateAsync();
+        }
 
-    var roleManager =
-        scope.ServiceProvider
-            .GetRequiredService<RoleManager<IdentityRole>>();
+        var roleManager =
+            scope.ServiceProvider
+                .GetRequiredService<RoleManager<IdentityRole>>();
 
-    await RoleSeederService.SeedAsync(roleManager);
+        await RoleSeederService.SeedAsync(roleManager);
 
-    var seeder =
-        scope.ServiceProvider
-            .GetRequiredService<IRoleSeederService>();
+        var seeder =
+            scope.ServiceProvider
+                .GetRequiredService<IRoleSeederService>();
 
-    await seeder.SeedRolesAndAdminAsync();
+        await seeder.SeedRolesAndAdminAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider
+            .GetRequiredService<ILogger<Program>>();
+            
+        logger.LogError(ex, "An error occurred during migration or seeding");
+        
+        throw; 
+    }
 }
 
 // Swagger
