@@ -341,19 +341,17 @@ using (var scope = app.Services.CreateScope())
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Forwarded Headers (IMPORTANT FOR RAILWAY)
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
-app.UseHttpsRedirection();
 
 app.UseStaticFiles();
 
-app.UseCors("AllowReactApp");
+app.UseRouting(); 
+
+app.UseCors("AllowReactApp"); 
 
 app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
@@ -363,14 +361,10 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
-// Health Check
 app.MapGet("/", () => Results.Ok("Clinic API Running"));
-
 app.MapControllers();
-
 app.MapHub<ClinicHub>("/clinicHub");
 
-// Hangfire Dashboard
 app.UseHangfireDashboard("/hangfire");
 
 app.Run();
