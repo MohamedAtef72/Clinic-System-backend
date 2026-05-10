@@ -114,10 +114,10 @@ builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>(
 // SignalR
 builder.Services.AddSignalR();
 
-// Redis
-var redisConn =
-    Environment.GetEnvironmentVariable("REDIS_URL")
-    ?? builder.Configuration["Redis__Connection"];
+var redisUrl = 
+    Environment.GetEnvironmentVariable("REDIS_URL") ??
+    Environment.GetEnvironmentVariable("REDIS_PUBLIC_URL") ??
+    builder.Configuration["Redis__Connection"];
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(
     sp => ConnectionMultiplexer.Connect(redisConn)
