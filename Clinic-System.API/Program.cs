@@ -120,7 +120,7 @@ var redisUrl =
     builder.Configuration["Redis__Connection"];
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(
-    sp => ConnectionMultiplexer.Connect(redisConn)
+    _ => ConnectionMultiplexer.Connect(redisUrl!)
 );
 
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
