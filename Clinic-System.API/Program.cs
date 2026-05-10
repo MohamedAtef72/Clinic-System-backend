@@ -337,23 +337,22 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Swagger
-app.UseSwagger();
-app.UseSwaggerUI();
-
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
-app.UseHttpsRedirection();
+// Swagger
+app.UseSwagger();
+app.UseSwaggerUI();
+
 app.UseStaticFiles();
 
 app.UseRouting(); 
 
 app.UseCors("AllowReactApp"); 
 
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+// app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 
@@ -361,7 +360,6 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
-app.MapGet("/", () => Results.Ok("Clinic API Running"));
 app.MapControllers();
 app.MapHub<ClinicHub>("/clinicHub");
 
