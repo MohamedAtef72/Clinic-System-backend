@@ -23,7 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Railway Dynamic Port
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"https://*:{port}");
+builder.WebHost.UseUrls($"http://*:{port}");
 
 // Add environment variables
 builder.Configuration.AddEnvironmentVariables();
