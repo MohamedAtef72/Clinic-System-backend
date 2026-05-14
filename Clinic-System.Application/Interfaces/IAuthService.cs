@@ -12,13 +12,12 @@ namespace Clinic_System.Application.Interfaces
 {
     public interface IAuthService
     {
-        Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress, HttpResponse response);
+        Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress, HttpResponse response, IList<string> roles);
         string GenerateAccessToken(IEnumerable<Claim> claims);
         string GenerateRefreshToken();
         ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
         Task<RefreshToken> GetSavedRefreshTokenAsync(string userName , string refreshToken);
         Task RevokeRefreshToken(RefreshToken refreshToken);
-        Task SaveRefreshToken(ApplicationUser user , string refreshToken);
         List<Claim> GetClaims(ApplicationUser user);    
     }
 }

@@ -8,6 +8,7 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
+using DotNetEnv;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -19,11 +20,26 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 
+// Load .env BEFORE CreateBuilder so all config sources see the values.
+// Check multiple candidate paths: published output dir, CWD, and API project folder.
+var envCandidates = new[]
+{
+    Path.Combine(AppContext.BaseDirectory, ".env"),          // published / Docker
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),   // dotnet run from API folder
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
+};
+
+var envFile = envCandidates.FirstOrDefault(File.Exists);
+if (envFile is not null)
+    // overwriteExisting: false — Railway (and any platform) injects real OS env vars
+    // before the process starts; we must not let the .env file stomp on them.
+    Env.Load(envFile, overwriteExisting: false);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Railway Dynamic Port
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"https://*:{port}");
+builder.WebHost.UseUrls($"http://*:{port}");
 
 // Add environment variables
 builder.Configuration.AddEnvironmentVariables();
@@ -115,9 +131,12 @@ builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>(
 builder.Services.AddSignalR();
 
 // Redis
-var redisConn =
-    Environment.GetEnvironmentVariable("REDIS_URL")
-    ?? builder.Configuration["Redis__Connection"];
+var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
+
+if (string.IsNullOrWhiteSpace(redisConn))
+    throw new InvalidOperationException(
+        "Redis__BaseUrl environment variable is not set. " +
+        "Add it in Railway Variables tab or your local .env file.");
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(
     sp => ConnectionMultiplexer.Connect(redisConn)
@@ -198,14 +217,27 @@ builder.Services.AddTransient<IMailingServices, MailingService>();
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
-// CORS
+// CORS — support both production origin and local dev origins
 var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
+
+var corsOrigins = new List<string>();
+if (!string.IsNullOrWhiteSpace(allowedOrigin))
+    corsOrigins.Add(allowedOrigin.TrimEnd('/'));
+
+// Always allow common local dev ports
+corsOrigins.AddRange(new[]
+{
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:4200",
+    "http://localhost:8080",
+});
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(allowedOrigin!)
+        policy.WithOrigins(corsOrigins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -301,22 +333,40 @@ var app = builder.Build();
 // Seeder + Migrations
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext =
-        scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        var dbContext =
+            scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    dbContext.Database.Migrate();
+        // Check pending migrations before applying
+        var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
 
-    var roleManager =
-        scope.ServiceProvider
-            .GetRequiredService<RoleManager<IdentityRole>>();
+        if (pendingMigrations.Any())
+        {
+            await dbContext.Database.MigrateAsync();
+        }
 
-    await RoleSeederService.SeedAsync(roleManager);
+        var roleManager =
+            scope.ServiceProvider
+                .GetRequiredService<RoleManager<IdentityRole>>();
 
-    var seeder =
-        scope.ServiceProvider
-            .GetRequiredService<IRoleSeederService>();
+        await RoleSeederService.SeedAsync(roleManager);
 
-    await seeder.SeedRolesAndAdminAsync();
+        var seeder =
+            scope.ServiceProvider
+                .GetRequiredService<IRoleSeederService>();
+
+        await seeder.SeedRolesAndAdminAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider
+            .GetRequiredService<ILogger<Program>>();
+
+        logger.LogError(ex, "An error occurred during migration or seeding");
+
+        throw;
+    }
 }
 
 // Swagger
@@ -331,13 +381,9 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
         ForwardedHeaders.XForwardedProto
 });
 
-app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 
 app.UseCors("AllowReactApp");
-
-app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 

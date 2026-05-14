@@ -24,17 +24,12 @@ namespace Clinic_System.Infrastructure.Services
 
         public async Task<(string? Error, ApplicationUser? existingUser)> RegisterUserAsync(UserRegisterBase dto, string role)
         {
-            var sw = Stopwatch.StartNew();
-
             var email = dto.Email;
 
             // Track: Email Check
             var existingUser = await _userManager.Users
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(u => u.Email == email);
-
-            _logger.LogInformation("Email check: {Time}ms", sw.ElapsedMilliseconds);
-            sw.Restart();
 
             if (existingUser != null)
             {
@@ -62,12 +57,8 @@ namespace Clinic_System.Infrastructure.Services
 
                     // Track: Password Reset
                     var token = await _userManager.GeneratePasswordResetTokenAsync(existingUser);
-                    _logger.LogInformation("Password reset token generated: {Time}ms", sw.ElapsedMilliseconds);
-                    sw.Restart();
 
                     var resetResult = await _userManager.ResetPasswordAsync(existingUser, token, dto.Password);
-                    _logger.LogInformation("Password reset completed: {Time}ms", sw.ElapsedMilliseconds);
-                    sw.Restart();
 
                     if (!resetResult.Succeeded)
                     {
@@ -78,13 +69,9 @@ namespace Clinic_System.Infrastructure.Services
 
                     // Track: User Update
                     await _userManager.UpdateAsync(existingUser);
-                    _logger.LogInformation("User update completed: {Time}ms", sw.ElapsedMilliseconds);
-                    sw.Restart();
 
                     // Ensure user is in the correct role
                     var roles = await _userManager.GetRolesAsync(existingUser);
-                    _logger.LogInformation("User roles retrieved: {Time}ms", sw.ElapsedMilliseconds);
-                    sw.Restart();
 
                     if (!roles.Contains(role))
                     {
@@ -126,8 +113,6 @@ namespace Clinic_System.Infrastructure.Services
 
             // Track: User Creation
             var result = await _userManager.CreateAsync(user, dto.Password);
-            _logger.LogInformation("User creation: {Time}ms", sw.ElapsedMilliseconds);
-                        sw.Restart();
 
             if (!result.Succeeded)
             {
@@ -137,8 +122,6 @@ namespace Clinic_System.Infrastructure.Services
 
             // Track: Role Assignment
             await _userManager.AddToRoleAsync(user, role);
-            _logger.LogInformation("Role assignment: {Time}ms", sw.ElapsedMilliseconds);
-                        sw.Restart();
 
             return (null, user);
         }

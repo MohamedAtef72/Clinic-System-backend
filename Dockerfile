@@ -20,7 +20,7 @@ RUN dotnet publish "Clinic-System.API.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-COPY ["Clinic-System.API/.env", "."]
+# .env is NOT copied — secrets are injected as environment variables by Railway (or docker-compose env_file locally)
 
 ENV ASPNETCORE_URLS=http://+:8080
 
