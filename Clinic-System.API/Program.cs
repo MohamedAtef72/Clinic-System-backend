@@ -126,11 +126,13 @@ builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>(
 // SignalR
 builder.Services.AddSignalR();
 
-// Redis
-var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
+var redisUrl = 
+    Environment.GetEnvironmentVariable("REDIS_URL") ??
+    Environment.GetEnvironmentVariable("REDIS_PUBLIC_URL") ??
+    builder.Configuration["Redis__Connection"];
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(
-    sp => ConnectionMultiplexer.Connect(redisConn)
+    _ => ConnectionMultiplexer.Connect(redisUrl!)
 );
 
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
@@ -322,7 +324,7 @@ using (var scope = app.Services.CreateScope())
 
         // Check pending migrations before applying
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
-
+        
         if (pendingMigrations.Any())
         {
             await dbContext.Database.MigrateAsync();
@@ -344,28 +346,29 @@ using (var scope = app.Services.CreateScope())
     {
         var logger = scope.ServiceProvider
             .GetRequiredService<ILogger<Program>>();
-
+            
         logger.LogError(ex, "An error occurred during migration or seeding");
-
-        throw;
+        
+        throw; 
     }
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Swagger
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Forwarded Headers (IMPORTANT FOR RAILWAY)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto
-});
-
 app.UseStaticFiles();
 
-app.UseCors("AllowReactApp");
+app.UseRouting(); 
+
+app.UseCors("AllowReactApp"); 
+
+// app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 
@@ -373,14 +376,9 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
-// Health Check
-app.MapGet("/", () => Results.Ok("Clinic API Running"));
-
 app.MapControllers();
-
 app.MapHub<ClinicHub>("/clinicHub");
 
-// Hangfire Dashboard
 app.UseHangfireDashboard("/hangfire");
 
 app.Run();
