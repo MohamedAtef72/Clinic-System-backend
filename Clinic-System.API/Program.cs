@@ -332,7 +332,7 @@ using (var scope = app.Services.CreateScope())
 
         // Check pending migrations before applying
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
-
+        
         if (pendingMigrations.Any())
         {
             await dbContext.Database.MigrateAsync();
@@ -351,28 +351,28 @@ using (var scope = app.Services.CreateScope())
         await seeder.SeedRolesAndAdminAsync();
     }
     catch (Exception ex)
-    {
+    {            
         logger.LogError(ex, "An error occurred during migration or seeding");
-
-        throw;
+        throw; 
     }
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 // Swagger
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Forwarded Headers (IMPORTANT FOR RAILWAY)
-app.UseForwardedHeaders(new ForwardedHeadersOptions
-{
-    ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto
-});
-
 app.UseStaticFiles();
 
-app.UseCors("AllowReactApp");
+app.UseRouting(); 
+
+app.UseCors("AllowReactApp"); 
+
+// app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 
@@ -380,14 +380,9 @@ app.UseAuthorization();
 
 app.UseRateLimiter();
 
-// Health Check
-app.MapGet("/", () => Results.Ok("Clinic API Running"));
-
 app.MapControllers();
-
 app.MapHub<ClinicHub>("/clinicHub");
 
-// Hangfire Dashboard
 app.UseHangfireDashboard("/hangfire");
 
 app.Run();
