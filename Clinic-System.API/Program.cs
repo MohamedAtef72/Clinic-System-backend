@@ -20,20 +20,16 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 
-// Load .env BEFORE CreateBuilder so all config sources see the values.
-// Check multiple candidate paths: published output dir, CWD, and API project folder.
 var envCandidates = new[]
 {
-    Path.Combine(AppContext.BaseDirectory, ".env"),          // published / Docker
-    Path.Combine(Directory.GetCurrentDirectory(), ".env"),   // dotnet run from API folder
+    Path.Combine(AppContext.BaseDirectory, ".env"),          
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),   
     Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
 };
 
 var envFile = envCandidates.FirstOrDefault(File.Exists);
 if (envFile is not null)
-    // overwriteExisting: false — Railway (and any platform) injects real OS env vars
-    // before the process starts; we must not let the .env file stomp on them.
-    Env.Load(envFile, overwriteExisting: false);
+    Env.Load(envFile);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -133,11 +129,6 @@ builder.Services.AddSignalR();
 // Redis
 var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
 
-if (string.IsNullOrWhiteSpace(redisConn))
-    throw new InvalidOperationException(
-        "Redis__BaseUrl environment variable is not set. " +
-        "Add it in Railway Variables tab or your local .env file.");
-
 builder.Services.AddSingleton<IConnectionMultiplexer>(
     sp => ConnectionMultiplexer.Connect(redisConn)
 );
@@ -223,15 +214,6 @@ var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
 var corsOrigins = new List<string>();
 if (!string.IsNullOrWhiteSpace(allowedOrigin))
     corsOrigins.Add(allowedOrigin.TrimEnd('/'));
-
-// Always allow common local dev ports
-corsOrigins.AddRange(new[]
-{
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:4200",
-    "http://localhost:8080",
-});
 
 builder.Services.AddCors(options =>
 {
