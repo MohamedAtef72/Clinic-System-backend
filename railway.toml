@@ -5,5 +5,5 @@ dockerfilePath = "Dockerfile"
 [deploy]
 startCommand = "dotnet Clinic-System.API.dll"
 healthcheckPath = "/"
-healthcheckTimeout = 350
+healthcheckTimeout = 300
 restartPolicyType = "on_failure"
