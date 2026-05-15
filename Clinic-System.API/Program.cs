@@ -129,14 +129,16 @@ builder.Services.AddSignalR();
 // Redis Cache
 var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
 
-if (!string.IsNullOrEmpty(redisConn))
-{
-    builder.Services.AddSingleton<IConnectionMultiplexer>(
-        sp => ConnectionMultiplexer.Connect(redisConn)
-    );
+if (string.IsNullOrWhiteSpace(redisConn))
+    throw new InvalidOperationException(
+        "Redis__BaseUrl environment variable is not set. " +
+        "Add it in Railway Variables tab or your local .env file.");
 
-    builder.Services.AddScoped<ICacheService, RedisCacheService>();
-}
+builder.Services.AddSingleton<IConnectionMultiplexer>(
+    sp => ConnectionMultiplexer.Connect(redisConn)
+);
+
+builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -217,6 +219,15 @@ var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
 var corsOrigins = new List<string>();
 if (!string.IsNullOrWhiteSpace(allowedOrigin))
     corsOrigins.Add(allowedOrigin.TrimEnd('/'));
+
+// Always allow common local dev ports
+corsOrigins.AddRange(new[]
+{
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:4200",
+    "http://localhost:8080",
+});
 
 builder.Services.AddCors(options =>
 {
@@ -315,12 +326,6 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-
-
-if (string.IsNullOrEmpty(redisConn))
-{
-    logger.LogWarning("Redis is NOT configured");
-}
 
 // Seeder + Migrations
 using (var scope = app.Services.CreateScope())
