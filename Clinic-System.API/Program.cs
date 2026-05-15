@@ -126,14 +126,17 @@ builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>(
 // SignalR
 builder.Services.AddSignalR();
 
-// Redis
+// Redis Cache
 var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(
-    sp => ConnectionMultiplexer.Connect(redisConn)
-);
+if (!string.IsNullOrEmpty(redisConn))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        sp => ConnectionMultiplexer.Connect(redisConn)
+    );
 
-builder.Services.AddScoped<ICacheService, RedisCacheService>();
+    builder.Services.AddScoped<ICacheService, RedisCacheService>();
+}
 
 // JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -311,6 +314,13 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+
+
+if (string.IsNullOrEmpty(redisConn))
+{
+    logger.LogWarning("Redis is NOT configured");
+}
 
 // Seeder + Migrations
 using (var scope = app.Services.CreateScope())
@@ -342,9 +352,6 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        var logger = scope.ServiceProvider
-            .GetRequiredService<ILogger<Program>>();
-
         logger.LogError(ex, "An error occurred during migration or seeding");
 
         throw;
