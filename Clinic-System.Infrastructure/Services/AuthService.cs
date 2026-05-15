@@ -31,68 +31,57 @@ namespace Clinic_System.Infrastructure.Services
             _logger = logger;
         }
 
-        public async Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress, HttpResponse response)
+        public async Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress, HttpResponse response, IList<string> roles)
         {
             if (user.IsDeleted)
             {
                 throw new InvalidOperationException("User account is deactivated.");
             }
 
-            var roles = await _userManager.GetRolesAsync(user); 
+            var claims = GetClaims(user);
+            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
-            var claims = GetClaims(user); 
+            // 2. Generate tokens
+            var accessToken = GenerateAccessToken(claims);
+            var refreshToken = GenerateRefreshToken();
 
-            claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r))); 
-
-            // 2. Generate Tokens
-            var accessToken = GenerateAccessToken(claims); 
-
-            var refreshToken = GenerateRefreshToken(); 
-
-            // 3. Revoke old refresh tokens
-            var oldTokens = await _context.RefreshTokens
-                .AsNoTracking()
-                .Where(x => x.UserId == user.Id && !x.IsRevoked)
-                .ToListAsync(); 
-
-            foreach (var token in oldTokens)
-            {
-                token.IsRevoked = true;
-            }
-
-            // 4. Save new refresh token
             var refreshTokenDaysConfig = _config["JWT:RefreshTokenExpirationDays"];
             var expirationDays = !string.IsNullOrEmpty(refreshTokenDaysConfig)
                 ? int.Parse(refreshTokenDaysConfig)
                 : 7;
 
             var expirationMinutes = GetAccessTokenExpirationMinutes();
+            var hashedToken = HashToken(refreshToken);
+            var utcNow = DateTime.UtcNow;
 
-            var refreshTokenEntity = new RefreshToken
+
+            var tokenEntity = await _context.RefreshTokens
+                .FirstOrDefaultAsync(t => t.UserId == user.Id);
+
+            if (tokenEntity == null)
             {
-                UserId = user.Id,
-                Token = refreshToken,
-                ExpiryDate = DateTime.UtcNow.AddDays(expirationDays),
-                CreatedDate = DateTime.UtcNow,
-                CreatedByIp = ipAddress
-            };
+                tokenEntity = new RefreshToken { UserId = user.Id };
+                await _context.RefreshTokens.AddAsync(tokenEntity);
+            }
 
-            await SaveRefreshToken(user, refreshToken); 
+            // Overwrite with the new token (implicitly revokes the previous one)
+            tokenEntity.Token = hashedToken;
+            tokenEntity.ExpiryDate = utcNow.AddDays(expirationDays);
+            tokenEntity.CreatedDate = utcNow;
+            tokenEntity.CreatedByIp = ipAddress;
+            tokenEntity.IsRevoked = false;
 
-            // 5. Parse Access Token Expiry
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(accessToken);
+            await _context.SaveChangesAsync();
 
-
-            // 6. Set Cookies
-            var isHttps = true; // change to true if your app is served over HTTPS
+            // 4. Set cookies
+            var isHttps = true;
 
             var accessOptions = new CookieOptions
             {
                 HttpOnly = true,
                 Secure = isHttps,
                 SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
-                Expires = DateTime.UtcNow.AddMinutes(expirationMinutes + 3),
+                Expires = utcNow.AddMinutes(expirationMinutes + 3),
             };
 
             var refreshOptions = new CookieOptions
@@ -100,14 +89,13 @@ namespace Clinic_System.Infrastructure.Services
                 HttpOnly = true,
                 Secure = isHttps,
                 SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
-                Expires = DateTime.UtcNow.AddDays(expirationDays)
+                Expires = utcNow.AddDays(expirationDays)
             };
 
             response.Cookies.Append("t", accessToken, accessOptions);
-
             response.Cookies.Append("rt", refreshToken, refreshOptions);
 
-            // 7. Return DTO
+            // 5. Return DTO
             return new AuthResultDTO
             {
                 AccessToken = accessToken,
@@ -248,35 +236,6 @@ namespace Clinic_System.Infrastructure.Services
             }
         }
 
-        public async Task SaveRefreshToken(ApplicationUser user, string refreshToken)
-        {
-            var expirationDays = int.Parse(
-                _config["JWT:RefreshTokenExpirationDays"] ?? "7");
-
-            var expiry = DateTime.UtcNow.AddDays(expirationDays);
-
-            var hashedToken = HashToken(refreshToken);
-
-            var tokenEntity = await _context.RefreshTokens
-                .FirstOrDefaultAsync(t => t.UserId == user.Id);
-
-            if (tokenEntity == null)
-            {
-                tokenEntity = new RefreshToken
-                {
-                    UserId = user.Id
-                };
-
-                await _context.RefreshTokens.AddAsync(tokenEntity);
-            }
-
-            tokenEntity.Token = hashedToken;
-            tokenEntity.ExpiryDate = expiry;
-            tokenEntity.CreatedDate = DateTime.UtcNow;
-            tokenEntity.IsRevoked = false;
-
-            await _context.SaveChangesAsync();
-        }
         private string HashToken(string token)
         {
             using var sha = SHA256.Create();

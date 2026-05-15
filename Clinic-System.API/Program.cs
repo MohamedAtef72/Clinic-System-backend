@@ -8,6 +8,7 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Repositories;
 using Clinic_System.Infrastructure.Services;
+using DotNetEnv;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -18,6 +19,17 @@ using StackExchange.Redis;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+
+var envCandidates = new[]
+{
+    Path.Combine(AppContext.BaseDirectory, ".env"),          
+    Path.Combine(Directory.GetCurrentDirectory(), ".env"),   
+    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env"),
+};
+
+var envFile = envCandidates.FirstOrDefault(File.Exists);
+if (envFile is not null)
+    Env.Load(envFile);
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -198,14 +210,18 @@ builder.Services.AddTransient<IMailingServices, MailingService>();
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
-// CORS
+// CORS — support both production origin and local dev origins
 var allowedOrigin = builder.Configuration["AllowedCorsOrigin"];
+
+var corsOrigins = new List<string>();
+if (!string.IsNullOrWhiteSpace(allowedOrigin))
+    corsOrigins.Add(allowedOrigin.TrimEnd('/'));
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(allowedOrigin!)
+        policy.WithOrigins(corsOrigins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

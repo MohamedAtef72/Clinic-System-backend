@@ -87,13 +87,9 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Valid speciality is required" });
                 }
 
-                var sw = Stopwatch.StartNew();
                 // Track: User Registration
                 var (error, user) = await _registerService.RegisterUserAsync(
                     doctorRegister, "Doctor");
-
-                _logger.LogInformation("Register User: {Time}ms", sw.ElapsedMilliseconds);
-                sw.Restart();
 
                 if (error != null)
                 {
@@ -106,8 +102,6 @@ namespace Clinic_System.API.Controllers
                 var doctor = await _doctorService.EnsureDoctorExistsOrRestoreAsync(
                     user.Id, doctorRegister.SpecialityId);
 
-                _logger.LogInformation("Ensure Doctor Exists/Restored: {Time}ms", sw.ElapsedMilliseconds);
-                sw.Restart();
 
                 await _cache.BumpVersionAsync("doctors:list");
                 await _cache.BumpVersionAsync("admin:dashboard");
@@ -142,9 +136,6 @@ namespace Clinic_System.API.Controllers
                         mailRequest.Attachments
                     )
                 );
-
-                _logger.LogInformation("Email sending enqueued: {Time}ms", sw.ElapsedMilliseconds);
-
 
                 return Ok(new
                 {
@@ -312,9 +303,12 @@ namespace Clinic_System.API.Controllers
                     return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"; 
+                var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-                var result = await _authService.GenerateTokenAsync(user, clientIp, Response); 
+                // Fetch roles once here — avoids a second DB round-trip inside GenerateTokenAsync
+                var roles = await _userManager.GetRolesAsync(user);
+
+                var result = await _authService.GenerateTokenAsync(user, clientIp, Response, roles);
 
                 return Ok(new
                 {
@@ -397,9 +391,12 @@ namespace Clinic_System.API.Controllers
                 // 5. IMPORTANT: revoke current refresh token
                 await _authService.RevokeRefreshToken(savedToken);
 
-                // 6. Generate new tokens
+                // 6. Generate new tokens — extract roles from the existing (expired) JWT claims
+                //    so we avoid a GetRolesAsync DB call on every refresh.
+                var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var result = await _authService.GenerateTokenAsync(user, clientIp, Response);
+                var result = await _authService.GenerateTokenAsync(user, clientIp, Response, roles);
 
                 return Ok(new
                 {
