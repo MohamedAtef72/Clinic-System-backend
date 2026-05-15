@@ -127,7 +127,8 @@ builder.Services.AddScoped<INotificationQueryService, NotificationQueryService>(
 builder.Services.AddSignalR();
 
 // Redis Cache
-var redisConn = Environment.GetEnvironmentVariable("Redis__BaseUrl");
+var redisSettings = builder.Configuration.GetSection("Redis");
+var redisConn = redisSettings["BaseUrl"];
 
 if (string.IsNullOrWhiteSpace(redisConn))
     throw new InvalidOperationException(
