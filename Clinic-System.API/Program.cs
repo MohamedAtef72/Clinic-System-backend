@@ -378,7 +378,7 @@ app.UseRouting();
 
 app.UseCors("AllowReactApp"); 
 
-// app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 
 app.UseAuthentication();
 
