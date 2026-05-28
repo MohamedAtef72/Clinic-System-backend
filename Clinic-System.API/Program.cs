@@ -140,12 +140,15 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     var config = ConfigurationOptions.Parse(redisConn);
 
     config.AbortOnConnectFail = false;
+
     config.ConnectRetry = 5;
 
-    // Railway Redis proxy usually requires SSL
-    config.Ssl = redisConn.StartsWith("rediss://");
+    // IMPORTANT for Railway proxy
+    config.Ssl = true;
 
-    // Recommended for hosted environments
+    config.ConnectTimeout = 15000;   
+    config.SyncTimeout = 15000;
+
     config.KeepAlive = 30;
 
     return ConnectionMultiplexer.Connect(config);
