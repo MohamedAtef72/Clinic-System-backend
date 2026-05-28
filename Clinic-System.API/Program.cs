@@ -135,9 +135,21 @@ if (string.IsNullOrWhiteSpace(redisConn))
         "Redis__BaseUrl environment variable is not set. " +
         "Add it in Railway Variables tab or your local .env file.");
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(
-    sp => ConnectionMultiplexer.Connect(redisConn)
-);
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var config = ConfigurationOptions.Parse(redisConn);
+
+    config.AbortOnConnectFail = false;
+    config.ConnectRetry = 5;
+
+    // Railway Redis proxy usually requires SSL
+    config.Ssl = redisConn.StartsWith("rediss://");
+
+    // Recommended for hosted environments
+    config.KeepAlive = 30;
+
+    return ConnectionMultiplexer.Connect(config);
+});
 
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
 
