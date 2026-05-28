@@ -138,19 +138,18 @@ if (string.IsNullOrWhiteSpace(redisConn))
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     var config = ConfigurationOptions.Parse(redisConn);
-
+    
+    config.EndPoints.Clear();
+    config.EndPoints.Add("redis.railway.internal", 6379);
+    
+    config.Password = "qvXhjKqwGdnUliBAAbIdNQyqHVddTFgv";
+    
+    config.Ssl = false;
+    
     config.AbortOnConnectFail = false;
-
     config.ConnectRetry = 5;
-
-    // IMPORTANT for Railway proxy
-    config.Ssl = true;
-
-    config.ConnectTimeout = 15000;   
-    config.SyncTimeout = 15000;
-
-    config.KeepAlive = 30;
-
+    config.ConnectTimeout = 15000;
+    
     return ConnectionMultiplexer.Connect(config);
 });
 
