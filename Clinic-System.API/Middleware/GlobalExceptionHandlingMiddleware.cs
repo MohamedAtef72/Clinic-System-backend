@@ -40,7 +40,7 @@ namespace Clinic_System.API.Middleware
 
             var response = new
             {
-                message = "An error occurred while processing your request. Please try again later.",
+                message = exception.Message,
                 traceId = context.TraceIdentifier,
                 timestamp = DateTime.UtcNow
             };
