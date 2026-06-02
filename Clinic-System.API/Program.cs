@@ -136,7 +136,17 @@ if (string.IsNullOrWhiteSpace(redisConn))
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var config = ConfigurationOptions.Parse(redisConn); //  uses the variable
+    var config = new ConfigurationOptions();
+
+    var uri = new Uri(redisConn);
+    config.EndPoints.Add(uri.Host, uri.Port);
+
+    if (!string.IsNullOrEmpty(uri.UserInfo))
+    {
+        var parts = uri.UserInfo.Split(':', 2);
+        if (parts.Length == 2)
+            config.Password = Uri.UnescapeDataString(parts[1]);
+    }
 
     config.AbortOnConnectFail = false;
     config.ConnectRetry = 5;
