@@ -67,29 +67,29 @@ namespace Clinic_System.Infrastructure.Repositories
         }
         public async Task<IdentityResult> UpdateUserAsync(UserEditProfile userEdit , string userId)
         {
-            var userFromDB = await GetUserByIdAsync(userId);
+                var userFromDB = await GetUserByIdAsync(userId);
 
-            if (userFromDB == null)
-            {
-                return IdentityResult.Failed(new IdentityError { Description = "User not found." });
-            }
+                if (userFromDB == null)
+                {
+                    return IdentityResult.Failed(new IdentityError { Description = "User not found." });
+                }
 
-            // Update common fields
-            if(userEdit.UserName != null && userEdit.UserName != userFromDB.UserName)
-            {
-                userFromDB.UserName = userEdit.UserName;
-            }
-            if (userEdit.Country != null && userEdit.Country != userFromDB.Country)
-            {
-                userFromDB.Country = userEdit.Country;
-            }
-            // Upload new image if provided
-            if (userEdit.ImagePath != null && userEdit.ImagePath != userFromDB.ImagePath)
-             {
-                   userFromDB.ImagePath = userEdit.ImagePath;
-             }
-            // UserManager.UpdateAsync() calls SaveChangesAsync() internally
-            return await _userManager.UpdateAsync(userFromDB);
+                // Update common fields
+                if (userEdit.UserName != null && userEdit.UserName != userFromDB.UserName)
+                {
+                    userFromDB.UserName = userEdit.UserName;
+                }
+                if (userEdit.Country != null && userEdit.Country != userFromDB.Country)
+                {
+                    userFromDB.Country = userEdit.Country;
+                }
+                // Upload new image if provided
+                if (userEdit.ImagePath != null && userEdit.ImagePath != userFromDB.ImagePath)
+                {
+                    userFromDB.ImagePath = userEdit.ImagePath;
+                }
+                // UserManager.UpdateAsync() calls SaveChangesAsync() internally
+                return await _userManager.UpdateAsync(userFromDB);
         }
         public async Task<IdentityResult> DeleteUserWithRelatedDataAsync(string userId)
 

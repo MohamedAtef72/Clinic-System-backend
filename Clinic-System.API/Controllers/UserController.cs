@@ -21,6 +21,7 @@ namespace Clinic_System.API.Controllers
         private readonly IReceptionistService _receptionistService;
         private readonly IUserService _userService;
         private readonly ICacheService _cache;
+        private readonly ILogger _logger;
 
         public UserController(IDoctorService doctorService, IPatientService patientService,IReceptionistService receptionistService, IUserService userService , Clinic_System.Application.Interfaces.ICacheService cache)
         {
@@ -145,7 +146,7 @@ namespace Clinic_System.API.Controllers
             {
                 return BadRequest(new
                 {
-                    Message = "Update failed in user repository.",
+                    Message = "Update failed from user repository.",
                     Errors = result.Errors.Select(e => e.Description)
                 });
             }
@@ -171,9 +172,10 @@ namespace Clinic_System.API.Controllers
                 var resultPatientEdit = await _patientService.UpdatePatientAsync(userId, userEdit);
                 if (!resultPatientEdit.Succeeded)
                 {
+                    _logger.LogInformation("Update Patient Failed for UserId:Errors: {Errors}", string.Join(", ", resultPatientEdit.Errors.Select(e => e.Description)));
                     return BadRequest(new
                     {
-                        Message = "Update Patient Failed",
+                        Message = "Update Patient Failed from Patient Repository",
                         Errors = resultPatientEdit.Errors.Select(e => e.Description)
                     });
                 }

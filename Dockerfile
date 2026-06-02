@@ -20,7 +20,8 @@ RUN dotnet publish "Clinic-System.API.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-#COPY Clinic-System.API/.env .env  for Docker
+# for Docker secrets, we can use .env file to pass environment variables to the container
+# COPY Clinic-System.API/.env .env  
 
 ENV ASPNETCORE_URLS=http://+:8080
 

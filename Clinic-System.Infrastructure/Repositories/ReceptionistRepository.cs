@@ -63,7 +63,7 @@ namespace Clinic_System.Infrastructure.Repositories
 
             if (!isUpdated)
             {
-                return IdentityResult.Failed(new IdentityError { Description = "No changes detected." });
+                return IdentityResult.Success;
             }
 
             await _db.SaveChangesAsync(); 
