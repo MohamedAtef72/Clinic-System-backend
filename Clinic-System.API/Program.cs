@@ -132,24 +132,16 @@ var redisConn = redisSettings["BaseUrl"];
 
 if (string.IsNullOrWhiteSpace(redisConn))
     throw new InvalidOperationException(
-        "Redis__BaseUrl environment variable is not set. " +
-        "Add it in Railway Variables tab or your local .env file.");
+        "Redis__BaseUrl is not set. Add it in Railway Variables or local .env.");
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var config = ConfigurationOptions.Parse(redisConn);
-    
-    config.EndPoints.Clear();
-    config.EndPoints.Add("redis.railway.internal", 6379);
-    
-    config.Password = "qvXhjKqwGdnUliBAAbIdNQyqHVddTFgv";
-    
-    config.Ssl = false;
-    
+    var config = ConfigurationOptions.Parse(redisConn); //  uses the variable
+
     config.AbortOnConnectFail = false;
     config.ConnectRetry = 5;
     config.ConnectTimeout = 15000;
-    
+
     return ConnectionMultiplexer.Connect(config);
 });
 
