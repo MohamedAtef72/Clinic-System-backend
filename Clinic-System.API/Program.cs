@@ -131,28 +131,46 @@ var redisSettings = builder.Configuration.GetSection("Redis");
 var redisConn = redisSettings["BaseUrl"];
 
 if (string.IsNullOrWhiteSpace(redisConn))
-    throw new InvalidOperationException(
-        "Redis__BaseUrl is not set. Add it in Railway Variables or local .env.");
+    throw new InvalidOperationException("Redis__BaseUrl is not set.");
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
-    var config = new ConfigurationOptions();
-
-    var uri = new Uri(redisConn);
-    config.EndPoints.Add(uri.Host, uri.Port);
-
-    if (!string.IsNullOrEmpty(uri.UserInfo))
+    try
     {
-        var parts = uri.UserInfo.Split(':', 2);
-        if (parts.Length == 2)
-            config.Password = Uri.UnescapeDataString(parts[1]);
+        var uri = new Uri(redisConn);
+        var config = new ConfigurationOptions
+        {
+            AbortOnConnectFail = false,
+            ConnectRetry = 10,
+            ConnectTimeout = 30000,
+            SyncTimeout = 30000,
+            ResponseTimeout = 30000,
+            KeepAlive = 120,
+            DefaultDatabase = 0,
+            Ssl = uri.Scheme.Equals("rediss", StringComparison.OrdinalIgnoreCase),
+            SslProtocols = System.Security.Authentication.SslProtocols.Tls12,
+        };
+
+        config.EndPoints.Add(uri.Host, uri.Port);
+
+        if (!string.IsNullOrEmpty(uri.UserInfo))
+        {
+            var parts = uri.UserInfo.Split(':', 2);
+            if (parts.Length == 2)
+                config.Password = Uri.UnescapeDataString(parts[1]);
+        }
+
+        var connection = ConnectionMultiplexer.Connect(config);
+
+        if (!connection.IsConnected)
+            throw new InvalidOperationException("Failed to connect to Redis.");
+
+        return connection;
     }
-
-    config.AbortOnConnectFail = false;
-    config.ConnectRetry = 5;
-    config.ConnectTimeout = 15000;
-
-    return ConnectionMultiplexer.Connect(config);
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException($"Redis connection failed: {ex.Message}", ex);
+    }
 });
 
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
