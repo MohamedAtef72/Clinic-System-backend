@@ -160,12 +160,7 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
                 config.Password = Uri.UnescapeDataString(parts[1]);
         }
 
-        var connection = ConnectionMultiplexer.Connect(config);
-
-        if (!connection.IsConnected)
-            throw new InvalidOperationException("Failed to connect to Redis.");
-
-        return connection;
+        return ConnectionMultiplexer.Connect(config);  // ← no IsConnected check
     }
     catch (Exception ex)
     {
