@@ -156,11 +156,13 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         if (!string.IsNullOrEmpty(uri.UserInfo))
         {
             var parts = uri.UserInfo.Split(':', 2);
-            if (parts.Length == 2)
+            if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
                 config.Password = Uri.UnescapeDataString(parts[1]);
+            else if (parts.Length == 1 && !string.IsNullOrEmpty(parts[0]))
+                config.Password = Uri.UnescapeDataString(parts[0]);
         }
 
-        return ConnectionMultiplexer.Connect(config);  // ← no IsConnected check
+        return ConnectionMultiplexer.Connect(config);
     }
     catch (Exception ex)
     {
