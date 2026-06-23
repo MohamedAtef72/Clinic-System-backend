@@ -34,14 +34,11 @@ namespace Clinic_System.Infrastructure.Services
         public async Task<AuthResultDTO> GenerateTokenAsync(ApplicationUser user, string ipAddress, HttpResponse response, IList<string> roles)
         {
             if (user.IsDeleted)
-            {
                 throw new InvalidOperationException("User account is deactivated.");
-            }
 
             var claims = GetClaims(user);
             claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
-            // 2. Generate tokens
             var accessToken = GenerateAccessToken(claims);
             var refreshToken = GenerateRefreshToken();
 
@@ -53,29 +50,26 @@ namespace Clinic_System.Infrastructure.Services
             var expirationMinutes = GetAccessTokenExpirationMinutes();
             var hashedToken = HashToken(refreshToken);
             var utcNow = DateTime.UtcNow;
+            var expiryDate = utcNow.AddDays(expirationDays);
 
+            // Single round trip: MERGE does insert-or-update atomically
+            await _context.Database.ExecuteSqlInterpolatedAsync($@"
+                MERGE RefreshTokens AS target
+                USING (SELECT {user.Id} AS UserId) AS source
+                ON target.UserId = source.UserId
+                WHEN MATCHED THEN
+                    UPDATE SET Token = {hashedToken},
+                               ExpiryDate = {expiryDate},
+                               CreatedDate = {utcNow},
+                               CreatedByIp = {ipAddress},
+                               IsRevoked = 0
+                WHEN NOT MATCHED THEN
+                    INSERT (UserId, Token, ExpiryDate, CreatedDate, CreatedByIp, IsRevoked)
+                    VALUES ({user.Id}, {hashedToken}, {expiryDate}, {utcNow}, {ipAddress}, 0);
+            ");
 
-            var tokenEntity = await _context.RefreshTokens
-                .FirstOrDefaultAsync(t => t.UserId == user.Id);
-
-            if (tokenEntity == null)
-            {
-                tokenEntity = new RefreshToken { UserId = user.Id };
-                await _context.RefreshTokens.AddAsync(tokenEntity);
-            }
-
-            // Overwrite with the new token (implicitly revokes the previous one)
-            tokenEntity.Token = hashedToken;
-            tokenEntity.ExpiryDate = utcNow.AddDays(expirationDays);
-            tokenEntity.CreatedDate = utcNow;
-            tokenEntity.CreatedByIp = ipAddress;
-            tokenEntity.IsRevoked = false;
-
-            await _context.SaveChangesAsync();
-
-            // 4. Set cookies
+            // Cookies (unchanged)
             var isHttps = true;
-
             var accessOptions = new CookieOptions
             {
                 HttpOnly = true,
@@ -83,26 +77,19 @@ namespace Clinic_System.Infrastructure.Services
                 SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
                 Expires = utcNow.AddMinutes(expirationMinutes + 3),
             };
-
             var refreshOptions = new CookieOptions
             {
                 HttpOnly = true,
                 Secure = isHttps,
                 SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax,
-                Expires = utcNow.AddDays(expirationDays)
+                Expires = expiryDate
             };
 
             response.Cookies.Append("t", accessToken, accessOptions);
             response.Cookies.Append("rt", refreshToken, refreshOptions);
 
-            // 5. Return DTO
-            return new AuthResultDTO
-            {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken
-            };
+            return new AuthResultDTO { AccessToken = accessToken, RefreshToken = refreshToken };
         }
-
         public string GenerateAccessToken(IEnumerable<Claim> claims)
         {
             var jwtSettings = _config.GetSection("JWT");
@@ -128,7 +115,6 @@ namespace Clinic_System.Infrastructure.Services
 
             return handler.WriteToken(token);
         }
-
         public string GenerateRefreshToken()
         {
             var randomNumber = new byte[64];
@@ -136,7 +122,6 @@ namespace Clinic_System.Infrastructure.Services
             rng.GetBytes(randomNumber);
             return Convert.ToBase64String(randomNumber);
         }
-
         public ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
         {
             _logger.LogInformation("[AuthService.GetPrincipalFromExpiredToken] Validating expired token");
@@ -175,7 +160,6 @@ namespace Clinic_System.Infrastructure.Services
                 return null;
             }
         }
-
         public List<Claim> GetClaims(ApplicationUser user)
         {
             return new List<Claim>
@@ -186,7 +170,6 @@ namespace Clinic_System.Infrastructure.Services
                     new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 };
         }
-
         private double GetAccessTokenExpirationMinutes()
         {
             var expirationMinutes = _config["JWT:AccessTokenExpirationMinutes"];
@@ -235,13 +218,32 @@ namespace Clinic_System.Infrastructure.Services
                 _logger.LogWarning("[AuthService.RevokeRefreshToken] Refresh token is null");
             }
         }
-
         private string HashToken(string token)
         {
             using var sha = SHA256.Create();
             var bytes = Encoding.UTF8.GetBytes(token);
             var hash = sha.ComputeHash(bytes);
             return Convert.ToBase64String(hash);
+        }
+        private async Task SaveRefreshTokenAsync(string userId, string hashedToken, DateTime expiryDate, DateTime createdDate, string ip)
+        {
+            try
+            {
+                await _context.Database.ExecuteSqlInterpolatedAsync($@"
+                    MERGE RefreshTokens AS target
+                    USING (SELECT {userId} AS UserId) AS source
+                    ON target.UserId = source.UserId
+                    WHEN MATCHED THEN
+                        UPDATE SET Token = {hashedToken}, ExpiryDate = {expiryDate}, CreatedDate = {createdDate}, CreatedByIp = {ip}, IsRevoked = 0
+                    WHEN NOT MATCHED THEN
+                        INSERT (UserId, Token, ExpiryDate, CreatedDate, CreatedByIp, IsRevoked)
+                        VALUES ({userId}, {hashedToken}, {expiryDate}, {createdDate}, {ip}, 0);
+                ");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist refresh token for user {UserId}", userId);
+            }
         }
     }
 }
