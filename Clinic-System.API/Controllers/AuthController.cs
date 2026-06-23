@@ -1,21 +1,24 @@
-﻿using Clinic_System.Application.DTO;
+using Clinic_System.Application.DTO;
 using Clinic_System.Application.Interfaces;
 using Clinic_System.Domain.Constant;
 using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Clinic_System.Infrastructure.Services;
+using CloudinaryDotNet.Actions;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using static Clinic_System.Domain.Constant.AppConstants;
 
 namespace Clinic_System.API.Controllers
 {
@@ -34,6 +37,7 @@ namespace Clinic_System.API.Controllers
         private readonly IMailingServices _mailingServices;
         private readonly ICacheService _cache;
         private readonly IPhotoService _photoService;
+        private readonly AppDbContext _context;
 
 
         public AuthController(
@@ -47,12 +51,14 @@ namespace Clinic_System.API.Controllers
             IMailingServices mailingServices,
             IDoctorService doctorService,
             ICacheService cache,
-            IPhotoService photoService)
+            IPhotoService photoService,
+            AppDbContext context)
         {
             _receptionistService = receptionistService ;
             _registerService = registerService ;
             _userManager = userManager;
             _cache = cache ;
+            _context = context ;
             _config = config ;
             _authService = authService ;
             _logger = logger ;
@@ -63,7 +69,7 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("DoctorRegister")]
-        [Authorize(Roles = Role.Admin)]
+        [Authorize(Roles = Domain.Constant.Role.Admin)]
         public async Task<IActionResult> DoctorRegister([FromBody]DoctorRegisterDTO doctorRegister)
         {
             try
@@ -278,9 +284,10 @@ namespace Clinic_System.API.Controllers
         }
 
         [HttpPost("Login")]
-        [EnableRateLimiting("AuthPolicy")]
+        [EnableRateLimiting("AuthPolicy")]  // brute-force protection — was blocked by GlobalLimiter before
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -288,16 +295,29 @@ namespace Clinic_System.API.Controllers
                     return BadRequest(new { Message = "Email and password are required" });
                 }
 
-                var normalizedEmail = request.Email.ToUpper();
-                var user = await _userManager.FindByEmailAsync(normalizedEmail); 
+                var normalizedEmail = request.Email.ToUpperInvariant();
 
-                if (user == null || user.IsDeleted)
+                // Single round trip: user + roles in one query
+                var loginData = await _context.Users
+                    .Where(u => u.NormalizedEmail == normalizedEmail && !u.IsDeleted)
+                    .Select(u => new
+                    {
+                        User = u,
+                        Roles = (from ur in _context.UserRoles
+                                 join r in _context.Roles on ur.RoleId equals r.Id
+                                 where ur.UserId == u.Id
+                                 select r.Name).ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (loginData == null)
                 {
                     return Unauthorized(new { Message = "Invalid email or password" });
                 }
 
-                var validPassword = await _userManager.CheckPasswordAsync(user, request.Password); 
+                var user = loginData.User;
 
+                var validPassword = await _userManager.CheckPasswordAsync(user, request.Password);
                 if (!validPassword)
                 {
                     return Unauthorized(new { Message = "Invalid email or password" });
@@ -305,15 +325,12 @@ namespace Clinic_System.API.Controllers
 
                 var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-                // Fetch roles once here — avoids a second DB round-trip inside GenerateTokenAsync
-                var roles = await _userManager.GetRolesAsync(user);
+                var result = await _authService.GenerateTokenAsync(user, clientIp, Response, loginData.Roles);
 
-                var result = await _authService.GenerateTokenAsync(user, clientIp, Response, roles);
+                sw.Stop();
+                Console.WriteLine($"Elipsed time for all endpoint id {sw.Elapsed.TotalMilliseconds}ms");
 
-                return Ok(new
-                {
-                    Message = "Login successful",
-                });
+                return Ok(new { Message = "Login successful" });
             }
             catch (Exception ex)
             {

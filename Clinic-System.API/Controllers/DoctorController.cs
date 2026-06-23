@@ -4,6 +4,7 @@ using Clinic_System.Domain.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using System.Diagnostics;
 
 namespace Clinic_System.API.Controllers
 {
@@ -25,6 +26,7 @@ namespace Clinic_System.API.Controllers
         [EnableRateLimiting("ReadPolicy")]
         public async Task<IActionResult> GetAll([FromQuery] string? searchName, [FromQuery] string? gender, [FromQuery] int? speciality, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 6 )
         {
+            var sw = Stopwatch.StartNew();
             try
             {
                 var isAdmin = User.IsInRole("Admin");
@@ -67,6 +69,9 @@ namespace Clinic_System.API.Controllers
 
                 if (doctors == null || !doctors.Any())
                     return Ok(new { Message = "No doctors found.", Data = new List<object>() });
+
+                sw.Stop();
+                Console.WriteLine($"GetAllDoctors executed in {sw.ElapsedMilliseconds} ms");
 
                 return Ok(new
                 {
