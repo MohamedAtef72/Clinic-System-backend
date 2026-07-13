@@ -18,6 +18,13 @@ namespace Clinic_System.Infrastructure.Repositories
 
         public async Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAllAppointmentsAsync(string? status, int pageNumber , int pageSize)
         {
+            await _db.Appointments
+                .IgnoreQueryFilters()
+                .Where(a => a.Date < DateTime.Now &&
+                            a.AppointmentStatus != "Completed")
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(a => a.AppointmentStatus, "Cancelled"));
+                    
             var query = _db.Appointments
                 .IgnoreQueryFilters()
                 .Include(a => a.Visit)
