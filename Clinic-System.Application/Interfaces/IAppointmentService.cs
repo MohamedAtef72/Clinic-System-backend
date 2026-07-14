@@ -1,4 +1,5 @@
 ﻿using Clinic_System.Application.DTO;
+using Clinic_System.Domain.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,5 +17,7 @@ namespace Clinic_System.Application.Interfaces
         Task CreateAppointmentAsync(CreateAppointmentDTO dto);
         Task UpdateAppointmentStatusAsync(UpdateAppointmentDTO dto);
         Task DeleteAppointmentAsync(int id);
+        Task<List<Appointment>> GetAppointmentsWithRemindersAsync();
+        Task SaveChangesAsync();
     }
 }

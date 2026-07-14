@@ -300,13 +300,22 @@ builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 // Mail
 builder.Services.Configure<MailSettings>(
     builder.Configuration.GetSection("MailSettings"));
-builder.Services.AddTransient<IMailingServices, MailingService>();
+builder.Services.AddScoped<IMailingServices, MailingService>();
 
 // Admin seed settings
 builder.Services.Configure<AdminSettings>(
     builder.Configuration.GetSection("AdminSettings"));
 
 var app = builder.Build();
+
+// Hangfire recurring job for sending appointment reminder emails every minute
+var recurringJobManager =
+    app.Services.GetRequiredService<IRecurringJobManager>();
+
+recurringJobManager.AddOrUpdate<IMailingServices>(
+    "appointment-reminders",
+    service => service.SendReminderEmailAsync(),
+    Cron.Hourly);
 
 app.Use(async (context, next) =>
 {
@@ -316,7 +325,7 @@ app.Use(async (context, next) =>
 
     sw.Stop();
 
-    Console.WriteLine($"TOTAL PIPELINE: {sw.ElapsedMilliseconds} ms");
+    app.Logger.LogInformation("TOTAL PIPELINE: {ElapsedMilliseconds} ms", sw.ElapsedMilliseconds);
 });
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();

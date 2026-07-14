@@ -182,5 +182,15 @@ namespace Clinic_System.Infrastructure.Services
         {
             return await _appointmentRepository.GetAppointmentsByPatientIdAsync(status,patientId , pageNumber , pageSize);
         }
+
+        public async Task<List<Appointment>> GetAppointmentsWithRemindersAsync()
+        {
+            return await _appointmentRepository.GetAppointmentsWithRemindersAsync();
+        }
+        
+        public async Task SaveChangesAsync()
+        {
+            await _appointmentRepository.SaveChangesAsync();
+        }
     }
 }

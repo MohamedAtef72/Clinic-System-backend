@@ -26,6 +26,7 @@ namespace Clinic_System.Domain.Models
 
         // Soft Delete for Historical Medical Records
         public bool IsDeleted { get; set; } = false;
+        public bool ReminderSent { get; set; } = false;
         public DateTime? DeletedAt { get; set; }
 
         // Navigation

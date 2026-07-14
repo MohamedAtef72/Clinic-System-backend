@@ -20,5 +20,7 @@ namespace Clinic_System.Application.Interfaces
         Task<(List<AppointmentDTO> Appointments, int totalCount)> GetAppointmentsByPatientIdAsync(string? status, Guid patientId, int pageNumber, int pageSize);
         Task<Appointment?> GetByAvailabilityIdAsync(int availabilityId);
         Task<IDbContextTransaction> BeginTransactionAsync();
+        Task<List<Appointment>> GetAppointmentsWithRemindersAsync();
+        Task SaveChangesAsync();
     }
 }

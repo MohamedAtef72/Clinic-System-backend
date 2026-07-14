@@ -328,7 +328,7 @@ namespace Clinic_System.API.Controllers
                 var result = await _authService.GenerateTokenAsync(user, clientIp, Response, loginData.Roles);
 
                 sw.Stop();
-                Console.WriteLine($"Elipsed time for all endpoint id {sw.Elapsed.TotalMilliseconds}ms");
+                _logger.LogInformation("Elapsed time for Login endpoint: {ElapsedMs} ms", sw.Elapsed.TotalMilliseconds);
 
                 return Ok(new { Message = "Login successful" });
             }
