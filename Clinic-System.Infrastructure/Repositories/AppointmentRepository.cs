@@ -4,6 +4,7 @@ using Clinic_System.Domain.Models;
 using Clinic_System.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using static Clinic_System.Domain.Constant.AppConstants;
 
 namespace Clinic_System.Infrastructure.Repositories
 {
@@ -181,5 +182,24 @@ namespace Clinic_System.Infrastructure.Repositories
             return await _db.Database.BeginTransactionAsync();
         }
 
+        public async Task<List<Appointment>> GetAppointmentsWithRemindersAsync()
+        {
+            var now = DateTime.UtcNow;
+
+            var appointments = await _db.Appointments
+                .Include(a => a.Patient)
+                .Where(a =>
+                    a.AppointmentStatus == "Schedule" &&
+                    a.Date >= now.AddHours(23) &&
+                    a.Date <= now.AddHours(24) &&
+                    !a.ReminderSent)
+                .ToListAsync();
+
+            return appointments;
+        }
+        public async Task SaveChangesAsync()
+        {
+            await _db.SaveChangesAsync();
+        }
     }
 }

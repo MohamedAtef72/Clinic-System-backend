@@ -45,7 +45,10 @@ namespace Clinic_System.API.Controllers
                     // Try cache for non-admins
                     var version = await _cache.GetVersionAsync("doctors:list");
                     var sanitizedSearch = string.IsNullOrEmpty(searchName) ? "" : searchName;
-                    var cacheKey = $"doctors:list:{version}:{sanitizedSearch}:{pageNumber}:{pageSize}";
+                    var sanitizedGender = string.IsNullOrEmpty(gender) ? "" : gender;
+                    var sanitizedSpeciality = speciality.HasValue ? speciality.Value.ToString() : "";
+
+                    var cacheKey = $"doctors:list:{version}:{sanitizedSearch}:{sanitizedGender}:{sanitizedSpeciality}:{pageNumber}:{pageSize}";
                     var cached = await _cache.GetAsync<DoctorsListDto>(cacheKey);
 
                     if (cached != null)

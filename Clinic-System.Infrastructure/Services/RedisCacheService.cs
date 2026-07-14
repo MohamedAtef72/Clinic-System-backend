@@ -29,13 +29,15 @@ namespace Clinic_System.Infrastructure.Services
                 catch (RedisConnectionException ex) when (attempt < MaxRetries - 1)
                 {
                     attempt++;
-                    Console.Error.WriteLine($"Redis operation '{operationName}' failed (attempt {attempt}/{MaxRetries}): {ex.Message}. Retrying...");
+                    // Using Console.Error here previously; replace with logger via Console's output until DI logger is available.
+                    // Log to Trace as a neutral sink — primary logging is available through DI in higher layers.
+                    System.Diagnostics.Trace.TraceError($"Redis operation '{operationName}' failed (attempt {attempt}/{MaxRetries}): {ex.Message}. Retrying...");
                     await Task.Delay(RetryDelayMs * attempt);  // Exponential backoff
                 }
                 catch (TimeoutException ex) when (attempt < MaxRetries - 1)
                 {
                     attempt++;
-                    Console.Error.WriteLine($"Redis operation '{operationName}' timed out (attempt {attempt}/{MaxRetries}). Retrying...");
+                    System.Diagnostics.Trace.TraceError($"Redis operation '{operationName}' timed out (attempt {attempt}/{MaxRetries}). Retrying...");
                     await Task.Delay(RetryDelayMs * attempt);  // Exponential backoff
                 }
             }
@@ -62,17 +64,17 @@ namespace Clinic_System.Infrastructure.Services
             }
             catch (RedisConnectionException ex)
             {
-                Console.Error.WriteLine($"Redis connection error during GET: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis connection error during GET: {ex.Message}");
                 return default;  // Graceful fallback
             }
             catch (TimeoutException ex)
             {
-                Console.Error.WriteLine($"Redis timeout during GET: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis timeout during GET: {ex.Message}");
                 return default;  // Graceful fallback
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error getting from cache: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Error getting from cache: {ex.Message}");
                 return default;  // Graceful fallback
             }
         }
@@ -98,17 +100,17 @@ namespace Clinic_System.Infrastructure.Services
             }
             catch (RedisConnectionException ex)
             {
-                Console.Error.WriteLine($"Redis connection error during SET: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis connection error during SET: {ex.Message}");
                 // Silently fail for cache sets - don't disrupt the application flow
             }
             catch (TimeoutException ex)
             {
-                Console.Error.WriteLine($"Redis timeout during SET: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis timeout during SET: {ex.Message}");
                 // Silently fail for cache sets - don't disrupt the application flow
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error setting cache: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Error setting cache: {ex.Message}");
                 // Silently fail for cache sets - don't disrupt the application flow
             }
         }
@@ -134,17 +136,17 @@ namespace Clinic_System.Infrastructure.Services
             }
             catch (RedisConnectionException ex)
             {
-                Console.Error.WriteLine($"Redis connection error during GetVersion: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis connection error during GetVersion: {ex.Message}");
                 return Guid.NewGuid().ToString();  // Return new version on failure
             }
             catch (TimeoutException ex)
             {
-                Console.Error.WriteLine($"Redis timeout during GetVersion: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis timeout during GetVersion: {ex.Message}");
                 return Guid.NewGuid().ToString();  // Return new version on failure
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error getting version: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Error getting version: {ex.Message}");
                 return Guid.NewGuid().ToString();  // Return new version on failure
             }
         }
@@ -165,17 +167,17 @@ namespace Clinic_System.Infrastructure.Services
             }
             catch (RedisConnectionException ex)
             {
-                Console.Error.WriteLine($"Redis connection error during BumpVersion: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis connection error during BumpVersion: {ex.Message}");
                 // Silently fail - version bump is non-critical
             }
             catch (TimeoutException ex)
             {
-                Console.Error.WriteLine($"Redis timeout during BumpVersion: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Redis timeout during BumpVersion: {ex.Message}");
                 // Silently fail - version bump is non-critical
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error bumping version: {ex.Message}");
+                System.Diagnostics.Trace.TraceError($"Error bumping version: {ex.Message}");
                 // Silently fail - version bump is non-critical
             }
         }
